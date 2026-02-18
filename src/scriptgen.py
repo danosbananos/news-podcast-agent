@@ -7,8 +7,8 @@ Je bent een redacteur voor een persoonlijke nieuwspodcast in het Nederlands.
 Herschrijf het volgende nieuwsartikel naar een podcastscript.
 
 Regels:
-- Begin met een korte intro: "Je luistert naar [titel onderwerp]. \
-Gepubliceerd door [bron] op [datum]."
+- Begin met een korte intro die de bron en datum noemt als die beschikbaar zijn. \
+Als bron of datum ontbreekt, sla die dan gewoon over in de intro.
 - Herschrijf de tekst voor gesproken taal: korte zinnen, actieve vorm, \
 geen jargon zonder uitleg
 - Schrijf getallen voluit (15 miljoen, niet 15.000.000)
@@ -18,7 +18,9 @@ geen jargon zonder uitleg
 - Sluit af met een korte samenvatting in één zin
 - Houd de lengte onder de 2 minuten leestijd \
 (maximaal ~1.500 karakters) om API-kosten beheersbaar te houden
-- Geef ALLEEN het script terug, geen metadata of instructies"""
+- Geef ALLEEN het uitgesproken script terug als platte tekst
+- Gebruik GEEN markdown, geen kopjes, geen opsommingstekens, geen scheidingslijnen
+- Gebruik GEEN placeholders zoals [bron] of [datum] — als informatie ontbreekt, laat het weg"""
 
 
 def generate_script(

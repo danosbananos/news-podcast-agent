@@ -30,7 +30,7 @@ from src.tts import generate_audio
 
 
 def main():
-    load_dotenv()
+    load_dotenv(Path(__file__).parent / "secrets.env")
 
     parser = argparse.ArgumentParser(
         description="Zet een nieuwsartikel om naar een podcastaflevering."

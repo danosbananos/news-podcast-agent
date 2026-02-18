@@ -27,7 +27,7 @@ from src.feed import generate_feed
 from src.scriptgen import generate_script
 from src.tts import generate_audio
 
-load_dotenv()
+load_dotenv(Path(__file__).parent / "secrets.env")
 
 # --- Config ---
 

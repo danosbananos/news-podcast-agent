@@ -1,8 +1,30 @@
 """Tekstextractie uit URL, platte tekst of PDF."""
 
+import re
+from urllib.parse import urlparse
+
 import trafilatura
 import pdfplumber
 from pathlib import Path
+
+
+def _extract_html_title(html: str) -> str:
+    """Haal de <title> tag uit HTML als fallback."""
+    match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+    if match:
+        # Strip site suffix like " - NOS"
+        title = match.group(1).strip()
+        title = re.split(r"\s*[|\-–—]\s*(?=[^|]*$)", title)[0].strip()
+        return title
+    return ""
+
+
+def _domain_to_source(url: str) -> str:
+    """Haal een leesbare bronnaam uit het domein (nos.nl → NOS)."""
+    hostname = urlparse(url).hostname or ""
+    # Verwijder www. en TLD
+    name = hostname.removeprefix("www.").split(".")[0]
+    return name.upper() if len(name) <= 4 else name.capitalize()
 
 
 def from_url(url: str) -> dict:
@@ -11,39 +33,32 @@ def from_url(url: str) -> dict:
     if not downloaded:
         raise ValueError(f"Kon pagina niet ophalen: {url}")
 
-    text = trafilatura.extract(
+    # Extraheer tekst + metadata via bare_extraction (retourneert Document object)
+    doc = trafilatura.bare_extraction(
         downloaded,
         include_comments=False,
         include_tables=False,
         favor_precision=True,
     )
+
+    text = doc.text if doc else ""
     if not text or len(text.strip()) < 100:
         raise ValueError(
             "Geen bruikbare tekst gevonden. Artikel mogelijk achter paywall — "
             "stuur de tekst mee via bookmarklet/Shortcut, of upload als PDF."
         )
 
-    metadata = trafilatura.extract(
-        downloaded,
-        include_comments=False,
-        output_format="json",
-        only_with_metadata=False,
-    )
+    # Gebruik trafilatura-metadata, met fallbacks voor title en source
+    title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
+    source = (doc.sitename if doc else None) or _domain_to_source(url)
 
-    # Trafilatura's JSON output is een string; parse titel/auteur er handmatig uit
-    import json
-    meta = {}
-    if metadata:
-        try:
-            parsed = json.loads(metadata)
-            meta["title"] = parsed.get("title", "")
-            meta["author"] = parsed.get("author", "")
-            meta["source"] = parsed.get("sitename", "")
-            meta["date"] = parsed.get("date", "")
-        except json.JSONDecodeError:
-            pass
-
-    return {"text": text, **meta}
+    return {
+        "text": text,
+        "title": title,
+        "author": (doc.author if doc else None) or "",
+        "source": source,
+        "date": (doc.date if doc else None) or "",
+    }
 
 
 def from_pdf(pdf_path: str) -> dict:
