@@ -74,7 +74,14 @@ def get_database_url() -> str:
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_async_engine(get_database_url(), echo=False)
+        url = get_database_url()
+        connect_args = {}
+        # Railway's interne Postgres draait zonder SSL; asyncpg probeert
+        # standaard SSL-negotiatie wat een timeout veroorzaakt.
+        # Intern verkeer blijft binnen Railway's private netwerk.
+        if ".railway.internal" in os.getenv("DATABASE_URL", ""):
+            connect_args["ssl"] = False
+        _engine = create_async_engine(url, echo=False, connect_args=connect_args)
     return _engine
 
 
@@ -86,10 +93,21 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def init_db():
-    """Maak tabellen aan als ze niet bestaan."""
+    """Maak tabellen aan als ze niet bestaan. Retry voor Railway's private netwerk startup."""
+    import asyncio
     engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    last_error = None
+    for attempt in range(5):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            return
+        except Exception as e:
+            last_error = e
+            wait = 2 ** attempt
+            print(f"[db] Verbinding mislukt (poging {attempt + 1}/5), retry in {wait}s: {e}", flush=True)
+            await asyncio.sleep(wait)
+    raise last_error
 
 
 # --- CRUD ---

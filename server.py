@@ -27,7 +27,10 @@ from src.feed import generate_feed
 from src.scriptgen import generate_script
 from src.tts import generate_audio
 
-load_dotenv(Path(__file__).parent / "secrets.env")
+# Load secrets.env lokaal; op Railway staan env vars in het platform
+_env_file = Path(__file__).parent / "secrets.env"
+if _env_file.exists():
+    load_dotenv(_env_file)
 
 # --- Config ---
 
