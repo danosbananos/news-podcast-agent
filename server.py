@@ -240,6 +240,19 @@ async def get_feed():
     return Response(content=xml, media_type="application/rss+xml; charset=utf-8")
 
 
+@app.get("/static/{filename}")
+async def get_static(filename: str):
+    """Serveer statische bestanden (cover art etc.)."""
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Ongeldige bestandsnaam")
+    path = Path(__file__).parent / "static" / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden")
+    media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+    media_type = media_types.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media_type)
+
+
 @app.get("/audio/{filename}")
 async def get_audio(filename: str):
     """Serveer een mp3-bestand (publiek, geen auth)."""
