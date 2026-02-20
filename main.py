@@ -124,7 +124,9 @@ def main():
     else:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = (article.get("title", "podcast") or "podcast")[:50]
-        # Maak bestandsnaam veilig
+        # Maak bestandsnaam veilig (ASCII-only voor compatibiliteit)
+        import unicodedata
+        slug = unicodedata.normalize("NFKD", slug).encode("ascii", "ignore").decode("ascii")
         slug = "".join(c if c.isalnum() or c in "-_ " else "" for c in slug).strip()
         slug = slug.replace(" ", "_") or "podcast"
         output_path = f"output/{timestamp}_{slug}.mp3"

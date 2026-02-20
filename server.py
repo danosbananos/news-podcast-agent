@@ -109,6 +109,8 @@ async def process_article(episode_id: uuid.UUID, article: dict):
         # Stap 2: Audio genereren
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = (article.get("title", "podcast") or "podcast")[:50]
+        import unicodedata
+        slug = unicodedata.normalize("NFKD", slug).encode("ascii", "ignore").decode("ascii")
         slug = "".join(c if c.isalnum() or c in "-_ " else "" for c in slug).strip()
         slug = slug.replace(" ", "_") or "podcast"
         filename = f"{timestamp}_{slug}.mp3"
