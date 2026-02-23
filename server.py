@@ -11,7 +11,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 from src.database import (
@@ -155,6 +155,13 @@ async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
             detail="Geef minstens 'text' of 'url' mee.",
         )
 
+    # URL opschonen: apps zoals NRC delen soms "Titel https://..." als één string
+    if req.url:
+        import re
+        url_match = re.search(r'https?://\S+', req.url)
+        if url_match:
+            req.url = url_match.group(0)
+
     # Tekstextractie
     try:
         if req.text:
@@ -248,9 +255,16 @@ async def get_static(filename: str):
     path = Path(__file__).parent / "static" / filename
     if not path.exists():
         raise HTTPException(status_code=404, detail="Bestand niet gevonden")
-    media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+    media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".html": "text/html", ".css": "text/css", ".js": "application/javascript"}
     media_type = media_types.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path, media_type=media_type)
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page():
+    """Setup-pagina met Shortcut instructies en bookmarklet (publiek, geen auth)."""
+    path = Path(__file__).parent / "static" / "setup.html"
+    return HTMLResponse(content=path.read_text(encoding="utf-8"))
 
 
 @app.get("/audio/{filename}")

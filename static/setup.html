@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nieuws Podcast — Setup</title>
+<style>
+  :root { --bg: #fafafa; --fg: #1a1a1a; --accent: #0066cc; --card: #fff; --border: #e0e0e0; --code-bg: #f0f0f0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1a1a1a; --fg: #e0e0e0; --accent: #4da6ff; --card: #252525; --border: #333; --code-bg: #2a2a2a; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; padding: 1.5rem; max-width: 700px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+  h3 { font-size: 1rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.5rem; }
+  ol { padding-left: 1.5rem; }
+  ol ol { margin-top: 0.25rem; }
+  code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  pre { background: var(--code-bg); padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.75rem 0; font-size: 0.85em; line-height: 1.5; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .bookmarklet-link { display: inline-block; background: var(--accent); color: #fff; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: grab; margin: 0.5rem 0; }
+  .bookmarklet-link:active { cursor: grabbing; }
+  .config-input { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-family: monospace; font-size: 0.9rem; background: var(--card); color: var(--fg); margin: 0.25rem 0 0.75rem; }
+  .note { font-size: 0.85em; color: #888; font-style: italic; }
+  .emoji { font-style: normal; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* Shortcut step cards */
+  .step { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin: 0.75rem 0; position: relative; }
+  .step-number { display: inline-block; background: var(--accent); color: #fff; width: 1.8rem; height: 1.8rem; border-radius: 50%; text-align: center; line-height: 1.8rem; font-weight: 700; font-size: 0.85rem; margin-right: 0.5rem; flex-shrink: 0; }
+  .step-header { display: flex; align-items: center; margin-bottom: 0.35rem; }
+  .step-action { font-weight: 700; font-size: 0.95rem; }
+  .step-detail { margin-left: 2.3rem; font-size: 0.9rem; color: var(--fg); }
+  .step-detail code { font-size: 0.85em; }
+  .step-connector { width: 2px; height: 0.75rem; background: var(--border); margin-left: 0.9rem; }
+  .step-group { border-left: 3px solid var(--accent); margin: 1rem 0; padding-left: 1rem; }
+  .step-group-label { font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 0.5rem; }
+  .step-group-alt { border-left-color: var(--border); }
+  .step-group-alt .step-group-label { color: #888; }
+  .step-divider { display: flex; align-items: center; gap: 0.75rem; margin: 1.25rem 0; font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .step-divider::before, .step-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .config-value { background: var(--accent); color: #fff; padding: 0.1em 0.5em; border-radius: 3px; font-family: monospace; font-size: 0.85em; }
+  .field-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+  .field-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--border); }
+  .field-table td:first-child { font-weight: 600; white-space: nowrap; width: 1%; }
+</style>
+</head>
+<body>
+
+<h1>Nieuws Podcast — Setup</h1>
+<p>Deel artikelen vanuit je telefoon of desktop en luister ze als podcast.</p>
+
+<!-- Config -->
+<div class="card">
+  <h3>Configuratie</h3>
+  <label for="api-url">Server URL</label>
+  <input type="text" id="api-url" class="config-input" value="" placeholder="https://your-server.up.railway.app">
+  <label for="api-key">API Key</label>
+  <input type="text" id="api-key" class="config-input" placeholder="jouw-api-key">
+  <p class="note">Vul je server URL en API key in — de bookmarklet en instructies hieronder worden automatisch bijgewerkt.</p>
+</div>
+
+<!-- Apple Shortcut -->
+<h2>📱 Apple Shortcut (iPhone &amp; Mac)</h2>
+<p>Eén opdracht die overal werkt: vanuit Safari haalt hij de volledige tekst op (ook achter paywalls), vanuit andere apps stuurt hij de URL naar de server.</p>
+
+<h3>Nieuwe opdracht aanmaken</h3>
+<div class="card">
+  <ol>
+    <li>Open de <strong>Opdrachten</strong>-app</li>
+    <li>Tik <strong>+</strong> rechtsboven → noem het <strong>"Naar Podcast"</strong></li>
+    <li>Tik bovenaan op <strong>ⓘ</strong> → zet <strong>"Toon in deelpaneel"</strong> aan</li>
+  </ol>
+</div>
+
+<h3>Acties toevoegen</h3>
+<p class="note">Zoek elke actie via de zoekbalk onderaan. Tik om toe te voegen en configureer zoals hieronder.</p>
+
+<!-- Receive -->
+<div class="step">
+  <div class="step-header"><span class="step-number">0</span> <span class="step-action">Ontvang invoer van</span></div>
+  <div class="step-detail">
+    Stel in als: <strong>Ontvang <code>Safari-webpagina's</code> en <code>URL's</code> van <code>Deelpaneel</code></strong><br>
+    Bij <em>"Als er geen invoer is"</em>: laat op <strong>Ga door</strong> staan<br>
+    <span class="note">Zoek op "Ontvang" of "Receive". Dit is altijd de eerste actie.</span>
+  </div>
+</div>
+
+<!-- IF -->
+<div class="step">
+  <div class="step-header"><span class="step-number">1</span> <span class="step-action">Als</span></div>
+  <div class="step-detail">
+    Stel in: <strong>Als <code>Invoer opdracht</code> <code>is</code> <code>Safari-webpagina's</code></strong><br>
+    <span class="note">Zoek op "Als". Tik op "Conditie" en kies "is", tik dan op het type en kies "Safari-webpagina's".</span>
+  </div>
+</div>
+
+<!-- THEN branch -->
+<div class="step-group">
+  <div class="step-group-label">Dan — Safari (paywall-route)</div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">2</span> <span class="step-action">Haal artikel op via Safari Reader</span></div>
+    <div class="step-detail">
+      Input: <code>Invoer opdracht</code><br>
+      <span class="note">Zoek op "artikel". Deze actie gebruikt Safari Reader om de artikeltekst te extraheren.</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">3</span> <span class="step-action">Stel variabele in</span></div>
+    <div class="step-detail">Naam: <code>articleText</code><br>Waarde: <code>Artikel van webpagina</code> <span class="note">(het resultaat van stap 2)</span></div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">4</span> <span class="step-action">Haal gegevens op van Safari-webpagina</span></div>
+    <div class="step-detail">
+      Haal: <code>Pagina-URL</code> op van <code>Invoer opdracht</code><br>
+      <span class="note">Zoek op "Safari". Tik op "Naam" en kies "Pagina-URL".</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">5</span> <span class="step-action">Stel variabele in</span></div>
+    <div class="step-detail">Naam: <code>articleURL</code><br>Waarde: <code>Pagina-URL</code> <span class="note">(het resultaat van stap 4)</span></div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">6</span> <span class="step-action">Haal gegevens op van Safari-webpagina</span></div>
+    <div class="step-detail">
+      Haal: <code>Naam</code> op van <code>Invoer opdracht</code><br>
+      <span class="note">Zelfde actie als stap 4, maar kies nu "Naam" i.p.v. "Pagina-URL".</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">7</span> <span class="step-action">Stel variabele in</span></div>
+    <div class="step-detail">Naam: <code>articleTitle</code><br>Waarde: <code>Naam</code> <span class="note">(het resultaat van stap 6)</span></div>
+  </div>
+</div>
+
+<!-- OTHERWISE branch -->
+<div class="step-group step-group-alt">
+  <div class="step-group-label">Anders — URL-only route</div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">8</span> <span class="step-action">Haal URL's op uit invoer</span></div>
+    <div class="step-detail">
+      Input: <code>Invoer opdracht</code><br>
+      <span class="note">Zoek op "URL's". Dit extraheert een schone URL uit de gedeelde tekst — nodig omdat apps zoals NRC soms "Titel https://..." als één string delen.</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">9</span> <span class="step-action">Stel variabele in</span></div>
+    <div class="step-detail">Naam: <code>articleURL</code><br>Waarde: <code>URL's</code> <span class="note">(het resultaat van stap 8)</span></div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">10</span> <span class="step-action">Stel variabele in</span></div>
+    <div class="step-detail">Naam: <code>articleText</code><br>Waarde: <span class="note">(laat leeg)</span></div>
+  </div>
+
+  <div class="step">
+    <div class="step-header"><span class="step-number">11</span> <span class="step-action">Stel variabele in</span></div>
+    <div class="step-detail">Naam: <code>articleTitle</code><br>Waarde: <span class="note">(laat leeg)</span></div>
+  </div>
+</div>
+
+<!-- End If -->
+<div class="step" style="background: transparent; border-style: dashed;">
+  <div class="step-header"><span class="step-number" style="background: var(--border);">·</span> <span class="step-action" style="color: #888;">Einde als</span></div>
+</div>
+
+<div class="step-divider">Verstuur naar server</div>
+
+<!-- Shared steps -->
+<div class="step">
+  <div class="step-header"><span class="step-number">12</span> <span class="step-action">URL</span></div>
+  <div class="step-detail">Vul in: <code><span class="api-url-display">https://your-server.up.railway.app</span>/submit</code></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">13</span> <span class="step-action">Haal inhoud van URL op</span></div>
+  <div class="step-detail">
+    Methode: <code>POST</code><br><br>
+    <strong>Kopteksten:</strong>
+    <table class="field-table">
+      <tr><td>Authorization</td><td><code>Bearer <span class="api-key-display">JOUW_KEY</span></code></td></tr>
+      <tr><td>Content-Type</td><td><code>application/json</code></td></tr>
+    </table>
+    <br>
+    <strong>Hoofdtekst van verzoek:</strong> kies <code>JSON</code>
+    <table class="field-table">
+      <tr><td>url</td><td>variabele <code>articleURL</code></td></tr>
+      <tr><td>text</td><td>variabele <code>articleText</code></td></tr>
+      <tr><td>title</td><td>variabele <code>articleTitle</code></td></tr>
+    </table>
+    <span class="note">Zoek op "URL" of "Haal inhoud". Tik op "Geavanceerd" om kopteksten en hoofdtekst te zien.</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">14</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
+  <div class="step-detail">
+    Sleutel: <code>message</code><br>
+    <span class="note">Zoek op "woordenboek". Input is automatisch het resultaat van stap 13.</span>
+    <br><span class="note">De volledige actie leest: "Haal <code>waarde</code> op voor <code>message</code> in <code>Inhoud van URL</code>".</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">15</span> <span class="step-action">Toon waarschuwing</span></div>
+  <div class="step-detail">
+    Input: <code>Woordenboekwaarde</code> <span class="note">(het resultaat van stap 14)</span><br>
+    <span class="note">Zoek op "waarschuwing".</span>
+  </div>
+</div>
+
+<h3>Gebruik</h3>
+<div class="card">
+  <p><strong>Paywalled artikelen (NRC, NYT):</strong><br>
+  Open het artikel in Safari (waar je ingelogd bent) → deelknop → <strong>"Naar Podcast"</strong><br>
+  <span class="note">De opdracht haalt de volledige tekst op via Safari Reader.</span></p>
+  <br>
+  <p><strong>Gratis artikelen (NOS, etc.):</strong><br>
+  Deel de link vanuit elke app → <strong>"Naar Podcast"</strong><br>
+  <span class="note">De server haalt de tekst zelf op via de URL.</span></p>
+</div>
+
+<hr>
+
+<!-- Bookmarklet -->
+<h2>💻 Desktop — Bookmarklet</h2>
+<p>Sleep onderstaande knop naar je bladwijzerbalk. Klik erop wanneer je een artikel leest — de tekst wordt direct naar de podcast gestuurd.</p>
+
+<div class="card" id="bookmarklet-card">
+  <p id="bookmarklet-container">
+    <a class="bookmarklet-link" id="bookmarklet" href="#">📻 Naar Podcast</a>
+  </p>
+  <p class="note">Sleep deze link naar je bladwijzerbalk (of rechtsklik → Bladwijzer toevoegen).</p>
+</div>
+
+<details>
+  <summary>Bookmarklet broncode bekijken</summary>
+  <pre id="bookmarklet-source"></pre>
+</details>
+
+<hr>
+
+<h2>Podcast luisteren</h2>
+<p>Voeg deze feed-URL toe aan je podcast-app (Apple Podcasts, Overcast, etc.):</p>
+<div class="card">
+  <code id="feed-url-display"></code>
+</div>
+
+<script>
+const urlInput = document.getElementById('api-url');
+const keyInput = document.getElementById('api-key');
+
+function getBookmarkletCode(apiUrl, apiKey) {
+  // Readable version of the bookmarklet
+  return `javascript:void(function(){
+  var a=document.querySelector('article');
+  var t=a?a.innerText:document.body.innerText.substring(0,50000);
+  var u=location.href;
+  var n=document.title;
+  var s=location.hostname.replace('www.','');
+  fetch('${apiUrl}/submit',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer ${apiKey}'
+    },
+    body:JSON.stringify({url:u,text:t,title:n,source:s})
+  })
+  .then(function(r){return r.json()})
+  .then(function(d){alert(d.message||d.detail||'Verstuurd!')})
+  .catch(function(e){alert('Fout: '+e.message)})
+}())`;
+}
+
+function updateAll() {
+  var apiUrl = urlInput.value.replace(/\/+$/, '') || 'https://your-server.up.railway.app';
+  var apiKey = keyInput.value || 'JOUW_KEY';
+
+  // Update inline displays
+  document.querySelectorAll('.api-url-display').forEach(function(el) { el.textContent = apiUrl; });
+  document.querySelectorAll('.api-key-display').forEach(function(el) { el.textContent = apiKey; });
+
+  // Update bookmarklet
+  var code = getBookmarkletCode(apiUrl, apiKey);
+  var minified = code.replace(/\n\s*/g, '');
+  document.getElementById('bookmarklet').href = minified;
+  document.getElementById('bookmarklet-source').textContent = code;
+
+  // Update feed URL
+  document.getElementById('feed-url-display').textContent = apiUrl + '/feed.xml';
+}
+
+urlInput.addEventListener('input', updateAll);
+keyInput.addEventListener('input', updateAll);
+
+// Prefill from current page URL if served from the app
+if (location.origin && !location.origin.includes('localhost')) {
+  urlInput.value = location.origin;
+}
+updateAll();
+</script>
+
+</body>
+</html>
