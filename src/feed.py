@@ -69,8 +69,10 @@ def generate_feed(episodes: list, base_url: str) -> str:
         SubElement(image, "title").text = podcast_title
         SubElement(image, "link").text = base_url
 
-    # Episodes als items
+    # Episodes als items (alleen episodes met een bestaand audiobestand)
     for ep in episodes:
+        if not ep.audio_filename or _get_file_size(ep.audio_filename) == 0:
+            continue
         item = SubElement(channel, "item")
 
         SubElement(item, "title").text = ep.title or "Zonder titel"

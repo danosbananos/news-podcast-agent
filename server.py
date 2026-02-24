@@ -1,6 +1,7 @@
 """FastAPI server voor de nieuws-naar-podcast pipeline."""
 
 import os
+import re
 import uuid
 import tempfile
 import traceback
@@ -11,12 +12,15 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 from src.database import (
     EpisodeStatus,
     create_episode,
+    delete_episode,
+    delete_episodes_older_than,
     get_episode,
     init_db,
     list_episodes,
@@ -44,10 +48,42 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 
 # --- Startup / Shutdown ---
 
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "14"))
+
+
+def _delete_audio_file(filename: str | None):
+    """Verwijder een audiobestand van disk als het bestaat."""
+    if filename:
+        path = AUDIO_DIR / filename
+        path.unlink(missing_ok=True)
+
+
+async def _cleanup_old_episodes():
+    """Verwijder episodes ouder dan RETENTION_DAYS en hun audiobestanden."""
+    episodes = await delete_episodes_older_than(days=RETENTION_DAYS)
+    for ep in episodes:
+        _delete_audio_file(ep.audio_filename)
+    if episodes:
+        print(f"[cleanup] {len(episodes)} episode(s) ouder dan {RETENTION_DAYS} dagen verwijderd.", flush=True)
+
+
+async def _cleanup_orphaned_episodes():
+    """Verwijder database-records waarvan het audiobestand ontbreekt (bijv. na deploy zonder volume)."""
+    episodes = await list_episodes(limit=200)
+    orphaned = [ep for ep in episodes if ep.audio_filename and not (AUDIO_DIR / ep.audio_filename).exists()]
+    for ep in orphaned:
+        await delete_episode(ep.id)
+    if orphaned:
+        print(f"[cleanup] {len(orphaned)} episode(s) zonder audiobestand verwijderd.", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     await init_db()
+    # Ruim op bij elke (her)start
+    await _cleanup_old_episodes()
+    await _cleanup_orphaned_episodes()
     yield
 
 
@@ -56,6 +92,14 @@ app = FastAPI(
     description="Zet nieuwsartikelen om naar podcastafleveringen",
     version="0.2.0",
     lifespan=lifespan,
+)
+
+# CORS: nodig voor de bookmarklet die vanaf andere domeinen (nrc.nl, nytimes.com, etc.) fetch doet
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST", "GET", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -157,7 +201,6 @@ async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
 
     # URL opschonen: apps zoals NRC delen soms "Titel https://..." als één string
     if req.url:
-        import re
         url_match = re.search(r'https?://\S+', req.url)
         if url_match:
             req.url = url_match.group(0)
@@ -301,6 +344,22 @@ async def get_episode_detail(episode_id: str):
         raise HTTPException(status_code=404, detail="Aflevering niet gevonden")
 
     return _episode_to_response(episode)
+
+
+@app.delete("/episodes/{episode_id}", dependencies=[Depends(verify_api_key)])
+async def delete_episode_endpoint(episode_id: str):
+    """Verwijder een aflevering en het bijbehorende audiobestand."""
+    try:
+        ep_uuid = uuid.UUID(episode_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ongeldig episode ID")
+
+    episode = await delete_episode(ep_uuid)
+    if not episode:
+        raise HTTPException(status_code=404, detail="Aflevering niet gevonden")
+
+    _delete_audio_file(episode.audio_filename)
+    return {"status": "deleted", "title": episode.title}
 
 
 def _episode_to_response(ep) -> EpisodeResponse:

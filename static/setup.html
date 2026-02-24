@@ -62,128 +62,153 @@
   <p class="note">Vul je server URL en API key in — de bookmarklet en instructies hieronder worden automatisch bijgewerkt.</p>
 </div>
 
-<!-- Apple Shortcut -->
-<h2>📱 Apple Shortcut (iPhone &amp; Mac)</h2>
-<p>Eén opdracht die overal werkt: vanuit Safari haalt hij de volledige tekst op (ook achter paywalls), vanuit andere apps stuurt hij de URL naar de server.</p>
+<!-- Apple Shortcuts -->
+<h2>📱 Apple Shortcuts (iPhone &amp; Mac)</h2>
+<p>Twee opdrachten: één voor het delen vanuit elke app (URL-only), en één voor Safari die ook achter paywalls werkt.</p>
 
-<h3>Nieuwe opdracht aanmaken</h3>
+<!-- ==================== SHORTCUT 1 ==================== -->
+<h3>Opdracht 1: "Naar Podcast"</h3>
+<p>Deel een link vanuit elke app. De server haalt de tekst op via de URL.</p>
+
 <div class="card">
   <ol>
     <li>Open de <strong>Opdrachten</strong>-app</li>
-    <li>Tik <strong>+</strong> rechtsboven → noem het <strong>"Naar Podcast"</strong></li>
-    <li>Tik bovenaan op <strong>ⓘ</strong> → zet <strong>"Toon in deelpaneel"</strong> aan</li>
+    <li>Tik <strong>+</strong> → noem het <strong>"Naar Podcast"</strong></li>
+    <li>Tik op <strong>ⓘ</strong> → zet <strong>"Toon in deelpaneel"</strong> aan</li>
   </ol>
 </div>
 
-<h3>Acties toevoegen</h3>
-<p class="note">Zoek elke actie via de zoekbalk onderaan. Tik om toe te voegen en configureer zoals hieronder.</p>
-
-<!-- Receive -->
 <div class="step">
-  <div class="step-header"><span class="step-number">0</span> <span class="step-action">Ontvang invoer van</span></div>
+  <div class="step-header"><span class="step-number">1</span> <span class="step-action">Ontvang invoer van</span></div>
   <div class="step-detail">
-    Stel in als: <strong>Ontvang <code>Safari-webpagina's</code> en <code>URL's</code> van <code>Deelpaneel</code></strong><br>
+    Stel in als: <strong>Ontvang <code>URL's</code> van <code>Deelpaneel</code></strong><br>
     Bij <em>"Als er geen invoer is"</em>: laat op <strong>Ga door</strong> staan<br>
-    <span class="note">Zoek op "Ontvang" of "Receive". Dit is altijd de eerste actie.</span>
+    <span class="note">Zoek op "Ontvang".</span>
   </div>
 </div>
 
-<!-- IF -->
 <div class="step">
-  <div class="step-header"><span class="step-number">1</span> <span class="step-action">Als</span></div>
+  <div class="step-header"><span class="step-number">2</span> <span class="step-action">Haal URL's op uit invoer</span></div>
   <div class="step-detail">
-    Stel in: <strong>Als <code>Invoer opdracht</code> <code>is</code> <code>Safari-webpagina's</code></strong><br>
-    <span class="note">Zoek op "Als". Tik op "Conditie" en kies "is", tik dan op het type en kies "Safari-webpagina's".</span>
+    Input: <code>Invoer opdracht</code><br>
+    <span class="note">Zoek op "URL's". Extraheert een schone URL — nodig omdat apps zoals NRC soms "Titel https://..." als één string delen.</span>
   </div>
 </div>
 
-<!-- THEN branch -->
-<div class="step-group">
-  <div class="step-group-label">Dan — Safari (paywall-route)</div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">2</span> <span class="step-action">Haal artikel op via Safari Reader</span></div>
-    <div class="step-detail">
-      Input: <code>Invoer opdracht</code><br>
-      <span class="note">Zoek op "artikel". Deze actie gebruikt Safari Reader om de artikeltekst te extraheren.</span>
-    </div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">3</span> <span class="step-action">Stel variabele in</span></div>
-    <div class="step-detail">Naam: <code>articleText</code><br>Waarde: <code>Artikel van webpagina</code> <span class="note">(het resultaat van stap 2)</span></div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">4</span> <span class="step-action">Haal gegevens op van Safari-webpagina</span></div>
-    <div class="step-detail">
-      Haal: <code>Pagina-URL</code> op van <code>Invoer opdracht</code><br>
-      <span class="note">Zoek op "Safari". Tik op "Naam" en kies "Pagina-URL".</span>
-    </div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">5</span> <span class="step-action">Stel variabele in</span></div>
-    <div class="step-detail">Naam: <code>articleURL</code><br>Waarde: <code>Pagina-URL</code> <span class="note">(het resultaat van stap 4)</span></div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">6</span> <span class="step-action">Haal gegevens op van Safari-webpagina</span></div>
-    <div class="step-detail">
-      Haal: <code>Naam</code> op van <code>Invoer opdracht</code><br>
-      <span class="note">Zelfde actie als stap 4, maar kies nu "Naam" i.p.v. "Pagina-URL".</span>
-    </div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">7</span> <span class="step-action">Stel variabele in</span></div>
-    <div class="step-detail">Naam: <code>articleTitle</code><br>Waarde: <code>Naam</code> <span class="note">(het resultaat van stap 6)</span></div>
-  </div>
-</div>
-
-<!-- OTHERWISE branch -->
-<div class="step-group step-group-alt">
-  <div class="step-group-label">Anders — URL-only route</div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">8</span> <span class="step-action">Haal URL's op uit invoer</span></div>
-    <div class="step-detail">
-      Input: <code>Invoer opdracht</code><br>
-      <span class="note">Zoek op "URL's". Dit extraheert een schone URL uit de gedeelde tekst — nodig omdat apps zoals NRC soms "Titel https://..." als één string delen.</span>
-    </div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">9</span> <span class="step-action">Stel variabele in</span></div>
-    <div class="step-detail">Naam: <code>articleURL</code><br>Waarde: <code>URL's</code> <span class="note">(het resultaat van stap 8)</span></div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">10</span> <span class="step-action">Stel variabele in</span></div>
-    <div class="step-detail">Naam: <code>articleText</code><br>Waarde: <span class="note">(laat leeg)</span></div>
-  </div>
-
-  <div class="step">
-    <div class="step-header"><span class="step-number">11</span> <span class="step-action">Stel variabele in</span></div>
-    <div class="step-detail">Naam: <code>articleTitle</code><br>Waarde: <span class="note">(laat leeg)</span></div>
-  </div>
-</div>
-
-<!-- End If -->
-<div class="step" style="background: transparent; border-style: dashed;">
-  <div class="step-header"><span class="step-number" style="background: var(--border);">·</span> <span class="step-action" style="color: #888;">Einde als</span></div>
-</div>
-
-<div class="step-divider">Verstuur naar server</div>
-
-<!-- Shared steps -->
 <div class="step">
-  <div class="step-header"><span class="step-number">12</span> <span class="step-action">URL</span></div>
+  <div class="step-header"><span class="step-number">3</span> <span class="step-action">Stel variabele in</span></div>
+  <div class="step-detail">Naam: <code>articleURL</code><br>Waarde: <code>URL's</code> <span class="note">(het resultaat van stap 2)</span></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">4</span> <span class="step-action">URL</span></div>
   <div class="step-detail">Vul in: <code><span class="api-url-display">https://your-server.up.railway.app</span>/submit</code></div>
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">13</span> <span class="step-action">Haal inhoud van URL op</span></div>
+  <div class="step-header"><span class="step-number">5</span> <span class="step-action">Haal inhoud van URL op</span></div>
+  <div class="step-detail">
+    Methode: <code>POST</code><br><br>
+    <strong>Kopteksten:</strong>
+    <table class="field-table">
+      <tr><td>Authorization</td><td><code>Bearer <span class="api-key-display">JOUW_KEY</span></code></td></tr>
+      <tr><td>Content-Type</td><td><code>application/json</code></td></tr>
+    </table>
+    <br>
+    <strong>Hoofdtekst van verzoek:</strong> kies <code>JSON</code>
+    <table class="field-table">
+      <tr><td>url</td><td>variabele <code>articleURL</code></td></tr>
+    </table>
+    <span class="note">Zoek op "Haal inhoud". Tik op "Geavanceerd" om kopteksten en hoofdtekst te zien.</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">6</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
+  <div class="step-detail">
+    Sleutel: <code>message</code><br>
+    <span class="note">Zoek op "woordenboek".</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">7</span> <span class="step-action">Toon waarschuwing</span></div>
+  <div class="step-detail">
+    Input: <code>Woordenboekwaarde</code> <span class="note">(het resultaat van stap 6)</span>
+  </div>
+</div>
+
+<div class="card">
+  <p><strong>Gebruik:</strong> Open een artikel in NRC, NYT, NOS of elke andere app → deelknop → <strong>"Naar Podcast"</strong></p>
+  <p class="note">Werkt voor gratis artikelen. Bij paywalled content krijg je een foutmelding — gebruik dan Opdracht 2 via Safari.</p>
+</div>
+
+<!-- ==================== SHORTCUT 2 ==================== -->
+<h3>Opdracht 2: "Naar Podcast (Safari)"</h3>
+<p>Deel vanuit Safari. Haalt de volledige tekst op via Safari Reader — werkt ook achter paywalls waar je ingelogd bent.</p>
+
+<div class="card">
+  <ol>
+    <li>Tik <strong>+</strong> → noem het <strong>"Naar Podcast (Safari)"</strong></li>
+    <li>Tik op <strong>ⓘ</strong> → zet <strong>"Toon in deelpaneel"</strong> aan</li>
+  </ol>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">1</span> <span class="step-action">Ontvang invoer van</span></div>
+  <div class="step-detail">
+    Stel in als: <strong>Ontvang <code>Safari-webpagina's</code> van <code>Deelpaneel</code></strong><br>
+    Bij <em>"Als er geen invoer is"</em>: laat op <strong>Ga door</strong> staan<br>
+    <span class="note">Zoek op "Ontvang". Kies alleen Safari-webpagina's (geen URL's).</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">2</span> <span class="step-action">Haal artikel op via Safari Reader</span></div>
+  <div class="step-detail">
+    Input: <code>Invoer opdracht</code><br>
+    <span class="note">Zoek op "artikel". Gebruikt Safari Reader om de volledige artikeltekst te extraheren.</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">3</span> <span class="step-action">Stel variabele in</span></div>
+  <div class="step-detail">Naam: <code>articleText</code><br>Waarde: <code>Artikel via Safari Reader</code> <span class="note">(het resultaat van stap 2)</span></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">4</span> <span class="step-action">Haal gegevens op van Safari-webpagina</span></div>
+  <div class="step-detail">
+    Haal: <code>Pagina-URL</code> op van <code>Invoer opdracht</code><br>
+    <span class="note">Zoek op "Safari". Tik op "Naam" en kies "Pagina-URL".</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">5</span> <span class="step-action">Stel variabele in</span></div>
+  <div class="step-detail">Naam: <code>articleURL</code><br>Waarde: <code>Pagina-URL</code> <span class="note">(het resultaat van stap 4)</span></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">6</span> <span class="step-action">Haal gegevens op van Safari-webpagina</span></div>
+  <div class="step-detail">
+    Haal: <code>Naam</code> op van <code>Invoer opdracht</code><br>
+    <span class="note">Zelfde actie als stap 4, maar kies nu "Naam" i.p.v. "Pagina-URL".</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">7</span> <span class="step-action">Stel variabele in</span></div>
+  <div class="step-detail">Naam: <code>articleTitle</code><br>Waarde: <code>Naam</code> <span class="note">(het resultaat van stap 6)</span></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">8</span> <span class="step-action">URL</span></div>
+  <div class="step-detail">Vul in: <code><span class="api-url-display">https://your-server.up.railway.app</span>/submit</code></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">9</span> <span class="step-action">Haal inhoud van URL op</span></div>
   <div class="step-detail">
     Methode: <code>POST</code><br><br>
     <strong>Kopteksten:</strong>
@@ -198,36 +223,28 @@
       <tr><td>text</td><td>variabele <code>articleText</code></td></tr>
       <tr><td>title</td><td>variabele <code>articleTitle</code></td></tr>
     </table>
-    <span class="note">Zoek op "URL" of "Haal inhoud". Tik op "Geavanceerd" om kopteksten en hoofdtekst te zien.</span>
+    <span class="note">Zoek op "Haal inhoud". Tik op "Geavanceerd" om kopteksten en hoofdtekst te zien.</span>
   </div>
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">14</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
+  <div class="step-header"><span class="step-number">10</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
   <div class="step-detail">
     Sleutel: <code>message</code><br>
-    <span class="note">Zoek op "woordenboek". Input is automatisch het resultaat van stap 13.</span>
-    <br><span class="note">De volledige actie leest: "Haal <code>waarde</code> op voor <code>message</code> in <code>Inhoud van URL</code>".</span>
+    <span class="note">Zoek op "woordenboek".</span>
   </div>
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">15</span> <span class="step-action">Toon waarschuwing</span></div>
+  <div class="step-header"><span class="step-number">11</span> <span class="step-action">Toon waarschuwing</span></div>
   <div class="step-detail">
-    Input: <code>Woordenboekwaarde</code> <span class="note">(het resultaat van stap 14)</span><br>
-    <span class="note">Zoek op "waarschuwing".</span>
+    Input: <code>Woordenboekwaarde</code> <span class="note">(het resultaat van stap 10)</span>
   </div>
 </div>
 
-<h3>Gebruik</h3>
 <div class="card">
-  <p><strong>Paywalled artikelen (NRC, NYT):</strong><br>
-  Open het artikel in Safari (waar je ingelogd bent) → deelknop → <strong>"Naar Podcast"</strong><br>
-  <span class="note">De opdracht haalt de volledige tekst op via Safari Reader.</span></p>
-  <br>
-  <p><strong>Gratis artikelen (NOS, etc.):</strong><br>
-  Deel de link vanuit elke app → <strong>"Naar Podcast"</strong><br>
-  <span class="note">De server haalt de tekst zelf op via de URL.</span></p>
+  <p><strong>Gebruik:</strong> Open een artikel in Safari (waar je ingelogd bent bij NRC/NYT) → deelknop → <strong>"Naar Podcast (Safari)"</strong></p>
+  <p class="note">Safari Reader extraheert de volledige tekst, ook achter paywalls.</p>
 </div>
 
 <hr>

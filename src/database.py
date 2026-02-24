@@ -159,6 +159,34 @@ async def get_episode(episode_id: uuid.UUID) -> Optional[Episode]:
         return await session.get(Episode, episode_id)
 
 
+async def delete_episode(episode_id: uuid.UUID) -> Optional[Episode]:
+    """Verwijder een episode en geef het verwijderde object terug (voor bestandsopruiming)."""
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        episode = await session.get(Episode, episode_id)
+        if not episode:
+            return None
+        await session.delete(episode)
+        await session.commit()
+        return episode
+
+
+async def delete_episodes_older_than(days: int = 14) -> list[Episode]:
+    """Verwijder episodes ouder dan X dagen. Retourneert de verwijderde episodes."""
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        result = await session.execute(
+            select(Episode).where(Episode.created_at < cutoff)
+        )
+        episodes = list(result.scalars().all())
+        for episode in episodes:
+            await session.delete(episode)
+        await session.commit()
+        return episodes
+
+
 async def list_episodes(limit: int = 50) -> list[Episode]:
     """Haal de laatste episodes op, nieuwste eerst."""
     session_factory = get_session_factory()
