@@ -55,25 +55,19 @@ Voeg een vast audiobestand (korte gong/swoosh, ~1-2 seconden) toe aan het einde 
 
 ---
 
-## 4. NYT-app Shortcut debugging
-**Status:** Todo
-**Prioriteit:** Medium | **Effort:** Laag (diagnose)
+## 4. NYT-app: gift article links + Safari-route
+**Status:** Done
+**Prioriteit:** n.v.t.
 
-### Probleem
-Delen vanuit de NRC-app naar de "Naar Podcast" Shortcut werkt, maar vanuit de NYT-app niet (of niet betrouwbaar).
+### Diagnose
+NYT retourneert `403 Forbidden` bij server-side requests met trafilatura's standaard-headers (bot-detectie). NRC retourneert `200 OK` met volledige HTML (paywall is client-side JavaScript).
 
-### Onderzoeksvragen
-- Wat deelt de NYT-app precies via het Share Sheet? (URL, tekst, of een ander type?)
-- Verschijnt de Shortcut niet in het deelmenu, of verschijnt hij wel maar faalt hij?
-- Welke foutmelding verschijnt er?
+### Oplossing
+Browser-achtige HTTP headers (met name `Accept` en `User-Agent`) toegevoegd als fallback in `src/extract.py`. Hierdoor werken NYT **gift article links** (met `unlocked_article_code` parameter) via de URL-only Shortcut.
 
-### Mogelijke oplossingen
-- Invoertype van Shortcut 1 aanpassen (bijv. ook "Tekst" accepteren)
-- URL-extractie verbeteren voor het formaat dat NYT deelt
-- Safari-route blijft altijd de fallback voor paywalled NYT-content
-
-### Niet doen
-Een native iPhone-app bouwen lost het paywall-probleem niet op en is disproportioneel veel werk voor dit probleem.
+### Beperkingen
+- Reguliere NYT-artikelen (zonder gift link) blijven geblokkeerd — de server-side paywall vereist authenticatie.
+- Voor niet-gift NYT-artikelen: gebruik de Safari-route ("Naar Podcast (Safari)") waar je ingelogd bent.
 
 ---
 

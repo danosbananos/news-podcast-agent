@@ -2,10 +2,20 @@
 
 import re
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import trafilatura
 import pdfplumber
 from pathlib import Path
+
+# Browser-achtige headers voor sites met bot-detectie (bijv. NYT)
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                  "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                  "Version/17.0 Safari/605.1.15",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8",
+}
 
 
 def _extract_html_title(html: str) -> str:
@@ -27,9 +37,24 @@ def _domain_to_source(url: str) -> str:
     return name.upper() if len(name) <= 4 else name.capitalize()
 
 
+def _fetch_with_browser_headers(url: str) -> str | None:
+    """Fallback-fetch met browser-achtige headers voor sites met bot-detectie."""
+    try:
+        req = Request(url, headers=_BROWSER_HEADERS)
+        with urlopen(req, timeout=15) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        print(f"[extract] Browser-fetch ook mislukt: {e}", flush=True)
+        return None
+
+
 def from_url(url: str) -> dict:
-    """Haal artikeltekst op via URL (werkt alleen voor niet-paywalled artikelen)."""
+    """Haal artikeltekst op via URL. Gebruikt browser-headers als fallback."""
     downloaded = trafilatura.fetch_url(url)
+    if not downloaded:
+        # Fallback: sommige sites (NYT) blokkeren trafilatura's headers
+        print("[extract] trafilatura.fetch_url mislukt, probeer browser-headers...", flush=True)
+        downloaded = _fetch_with_browser_headers(url)
     if not downloaded:
         raise ValueError(f"Kon pagina niet ophalen: {url}")
 
