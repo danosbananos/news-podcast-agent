@@ -38,7 +38,7 @@ Beide punten vereisen aanpassingen aan dezelfde system prompt. Implementeer ze s
 ---
 
 ## 3. Audio-outro met vast geluid
-**Status:** Todo
+**Status:** Done
 **Prioriteit:** Medium | **Effort:** Laag
 
 ### Probleem
