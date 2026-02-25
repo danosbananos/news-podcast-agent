@@ -1,6 +1,6 @@
 # Backlog — Nieuws Podcast Agent
 
-## 1. Scriptvalidatie via prompt-verbetering
+## 1. Scriptvalidatie via prompt-verbetering + grammaticacontrole
 **Status:** Done
 **Prioriteit:** Hoog | **Effort:** Laag
 

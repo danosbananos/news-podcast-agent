@@ -1,6 +1,7 @@
-"""Podcastscript genereren met Claude Haiku."""
+"""Podcastscript genereren met Claude Haiku + grammaticacontrole."""
 
 import anthropic
+import httpx
 
 SYSTEM_PROMPT = """\
 Je bent een redacteur voor een persoonlijke nieuwspodcast in het Nederlands.
@@ -78,4 +79,51 @@ def generate_script(
         system=SYSTEM_PROMPT,
     )
 
-    return message.content[0].text
+    script = message.content[0].text
+
+    # Grammaticacontrole via LanguageTool
+    script = _fix_grammar(script)
+
+    return script
+
+
+def _fix_grammar(text: str) -> str:
+    """Corrigeer grammaticafouten via de gratis LanguageTool API.
+
+    Stuurt de tekst naar de publieke LanguageTool API voor Nederlandse
+    grammaticacontrole. Past automatisch correcties toe (bijv. 'sprang' → 'sprong').
+    Bij fouten wordt de originele tekst ongewijzigd teruggegeven.
+    """
+    try:
+        response = httpx.post(
+            "https://api.languagetool.org/v2/check",
+            data={
+                "text": text,
+                "language": "nl",
+                "enabledOnly": "false",
+            },
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        matches = response.json().get("matches", [])
+    except Exception as e:
+        print(f"[grammar] LanguageTool API niet bereikbaar ({e}), overgeslagen.", flush=True)
+        return text
+
+    if not matches:
+        return text
+
+    # Pas correcties toe van achteren naar voren (zodat offsets kloppen)
+    corrected = text
+    for match in sorted(matches, key=lambda m: m["offset"], reverse=True):
+        replacements = match.get("replacements", [])
+        if not replacements:
+            continue
+        offset = match["offset"]
+        length = match["length"]
+        fix = replacements[0]["value"]  # Eerste suggestie is meestal de beste
+        original = corrected[offset:offset + length]
+        corrected = corrected[:offset] + fix + corrected[offset + length:]
+        print(f"[grammar] '{original}' → '{fix}' ({match.get('rule', {}).get('id', '?')})", flush=True)
+
+    return corrected
