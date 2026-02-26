@@ -1,10 +1,13 @@
 """RSS feed generator voor Apple Podcasts-compatibele podcast feed."""
 
+import logging
 import os
 from datetime import datetime
 from email.utils import format_datetime
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, ElementTree, register_namespace, tostring
+
+logger = logging.getLogger(__name__)
 
 # iTunes namespace — registreer vóór het bouwen van elementen
 ITUNES_NS = "http://www.itunes.com/dtds/podcast-1.0.dtd"
@@ -70,9 +73,14 @@ def generate_feed(episodes: list, base_url: str) -> str:
         SubElement(image, "link").text = base_url
 
     # Episodes als items (alleen episodes met een bestaand audiobestand)
+    included = 0
+    skipped = 0
     for ep in episodes:
         if not ep.audio_filename or _get_file_size(ep.audio_filename) == 0:
+            skipped += 1
+            logger.debug("Feed: episode overgeslagen (geen audio): %s", ep.title)
             continue
+        included += 1
         item = SubElement(channel, "item")
 
         SubElement(item, "title").text = ep.title or "Zonder titel"
@@ -103,6 +111,8 @@ def generate_feed(episodes: list, base_url: str) -> str:
                 "length": str(audio_size),
                 "type": "audio/mpeg",
             })
+
+    logger.debug("Feed gegenereerd: %d episodes opgenomen, %d overgeslagen", included, skipped)
 
     # Serialize naar string
     xml_bytes = tostring(rss, encoding="unicode", xml_declaration=False)

@@ -1,5 +1,8 @@
 """Database models en CRUD voor podcast-afleveringen (PostgreSQL + SQLAlchemy async)."""
 
+import enum
+import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,8 +12,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-import enum
-import os
+logger = logging.getLogger(__name__)
 
 
 # --- Enum ---
@@ -81,7 +83,9 @@ def get_engine():
         # Intern verkeer blijft binnen Railway's private netwerk.
         if ".railway.internal" in os.getenv("DATABASE_URL", ""):
             connect_args["ssl"] = False
+            logger.debug("SSL uitgeschakeld voor Railway intern verkeer")
         _engine = create_async_engine(url, echo=False, connect_args=connect_args)
+        logger.debug("Database engine aangemaakt")
     return _engine
 
 
@@ -97,16 +101,19 @@ async def init_db():
     import asyncio
     engine = get_engine()
     last_error = None
+    logger.info("Database initialisatie gestart")
     for attempt in range(5):
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tabellen aangemaakt/geverifieerd")
             return
         except Exception as e:
             last_error = e
             wait = 2 ** attempt
-            print(f"[db] Verbinding mislukt (poging {attempt + 1}/5), retry in {wait}s: {e}", flush=True)
+            logger.warning("DB verbinding mislukt (poging %d/5), retry in %ds: %s", attempt + 1, wait, e)
             await asyncio.sleep(wait)
+    logger.error("Database initialisatie mislukt na 5 pogingen")
     raise last_error
 
 
@@ -131,6 +138,7 @@ async def create_episode(
         session.add(episode)
         await session.commit()
         await session.refresh(episode)
+        logger.debug("Episode aangemaakt: id=%s, titel='%s', tekst=%d chars", episode.id, title, len(article_text))
         return episode
 
 
@@ -143,12 +151,14 @@ async def update_episode(
     async with session_factory() as session:
         episode = await session.get(Episode, episode_id)
         if not episode:
+            logger.warning("Update mislukt — episode niet gevonden: %s", episode_id)
             return None
         for key, value in kwargs.items():
             if hasattr(episode, key):
                 setattr(episode, key, value)
         await session.commit()
         await session.refresh(episode)
+        logger.debug("Episode bijgewerkt: id=%s, velden=%s", episode_id, list(kwargs.keys()))
         return episode
 
 
@@ -175,6 +185,7 @@ async def delete_episodes_older_than(days: int = 14) -> list[Episode]:
     """Verwijder episodes ouder dan X dagen. Retourneert de verwijderde episodes."""
     from datetime import timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    logger.debug("Zoek episodes ouder dan %s (cutoff: %s)", days, cutoff.isoformat())
     session_factory = get_session_factory()
     async with session_factory() as session:
         result = await session.execute(

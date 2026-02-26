@@ -1,12 +1,15 @@
 """Tekstextractie uit URL, platte tekst of PDF."""
 
+import logging
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-import trafilatura
 import pdfplumber
-from pathlib import Path
+import trafilatura
+
+logger = logging.getLogger(__name__)
 
 # Browser-achtige headers voor sites met bot-detectie (bijv. NYT)
 _BROWSER_HEADERS = {
@@ -42,21 +45,27 @@ def _fetch_with_browser_headers(url: str) -> str | None:
     try:
         req = Request(url, headers=_BROWSER_HEADERS)
         with urlopen(req, timeout=15) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+            html = resp.read().decode("utf-8", errors="replace")
+            logger.debug("Browser-fetch geslaagd: %d bytes van %s", len(html), url)
+            return html
     except Exception as e:
-        print(f"[extract] Browser-fetch ook mislukt: {e}", flush=True)
+        logger.warning("Browser-fetch ook mislukt voor %s: %s", url, e)
         return None
 
 
 def from_url(url: str) -> dict:
     """Haal artikeltekst op via URL. Gebruikt browser-headers als fallback."""
+    logger.info("URL extractie gestart: %s", url)
     downloaded = trafilatura.fetch_url(url)
     if not downloaded:
         # Fallback: sommige sites (NYT) blokkeren trafilatura's headers
-        print("[extract] trafilatura.fetch_url mislukt, probeer browser-headers...", flush=True)
+        logger.info("trafilatura.fetch_url mislukt, probeer browser-headers voor %s", url)
         downloaded = _fetch_with_browser_headers(url)
     if not downloaded:
+        logger.error("Kon pagina niet ophalen (beide methoden mislukt): %s", url)
         raise ValueError(f"Kon pagina niet ophalen: {url}")
+
+    logger.debug("HTML opgehaald: %d bytes van %s", len(downloaded), url)
 
     # Extraheer tekst + metadata via bare_extraction (retourneert Document object)
     doc = trafilatura.bare_extraction(
@@ -68,6 +77,7 @@ def from_url(url: str) -> dict:
 
     text = doc.text if doc else ""
     if not text or len(text.strip()) < 100:
+        logger.warning("Onvoldoende tekst geëxtraheerd (%d chars) van %s — mogelijk paywall", len(text.strip()) if text else 0, url)
         raise ValueError(
             "Geen bruikbare tekst gevonden. Artikel mogelijk achter paywall — "
             "stuur de tekst mee via bookmarklet/Shortcut, of upload als PDF."
@@ -76,6 +86,8 @@ def from_url(url: str) -> dict:
     # Gebruik trafilatura-metadata, met fallbacks voor title en source
     title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
     source = (doc.sitename if doc else None) or _domain_to_source(url)
+
+    logger.info("URL extractie voltooid: titel='%s', bron=%s, tekst=%d chars", title, source, len(text))
 
     return {
         "text": text,
@@ -88,6 +100,7 @@ def from_url(url: str) -> dict:
 
 def from_pdf(pdf_path: str) -> dict:
     """Extraheer tekst uit een PDF-bestand."""
+    logger.info("PDF extractie gestart: %s", pdf_path)
     path = Path(pdf_path)
     if not path.exists():
         raise FileNotFoundError(f"PDF niet gevonden: {pdf_path}")
@@ -98,16 +111,21 @@ def from_pdf(pdf_path: str) -> dict:
             page_text = page.extract_text()
             if page_text:
                 pages.append(page_text)
+        logger.debug("PDF gelezen: %d pagina's, %d met tekst", len(pdf.pages), len(pages))
 
     text = "\n\n".join(pages)
     if len(text.strip()) < 100:
+        logger.warning("Onvoldoende tekst uit PDF (%d chars): %s", len(text.strip()), pdf_path)
         raise ValueError("Kon geen bruikbare tekst uit de PDF extraheren.")
 
+    logger.info("PDF extractie voltooid: %d pagina's, %d chars", len(pages), len(text))
     return {"text": text, "title": path.stem}
 
 
 def from_text(text: str, title: str = "", source: str = "") -> dict:
     """Wikkel platte tekst in het standaardformaat."""
     if len(text.strip()) < 50:
+        logger.warning("Tekst te kort: %d chars (minimaal 50)", len(text.strip()))
         raise ValueError("Tekst is te kort om een podcastscript van te maken.")
+    logger.info("Tekst-extractie: titel='%s', bron='%s', %d chars", title, source, len(text))
     return {"text": text, "title": title, "source": source}

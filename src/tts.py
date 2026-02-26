@@ -1,7 +1,11 @@
 """Text-to-Speech via ElevenLabs API."""
 
+import logging
 from pathlib import Path
+
 from elevenlabs import ElevenLabs
+
+logger = logging.getLogger(__name__)
 
 OUTRO_PATH = Path(__file__).parent.parent / "static" / "outro.mp3"
 
@@ -25,6 +29,7 @@ def generate_audio(
     Returns:
         Path naar het gegenereerde mp3-bestand
     """
+    logger.info("TTS gestart: model=%s, voice=%s, script=%d chars", model_id, voice_id, len(script))
     client = ElevenLabs(api_key=api_key)
 
     audio_iterator = client.text_to_speech.convert(
@@ -37,22 +42,25 @@ def generate_audio(
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    bytes_written = 0
     with open(out, "wb") as f:
         for chunk in audio_iterator:
             f.write(chunk)
+            bytes_written += len(chunk)
+    logger.debug("TTS audio ontvangen: %d bytes naar %s", bytes_written, out)
 
     # Voeg outro-geluid toe aan het einde
     _append_outro(out)
 
     size_kb = out.stat().st_size / 1024
-    print(f"Audio opgeslagen: {out} ({size_kb:.0f} KB)")
+    logger.info("Audio opgeslagen: %s (%.0f KB)", out, size_kb)
     return out
 
 
 def _append_outro(audio_path: Path):
     """Voeg het outro-geluid toe aan het einde van een mp3-bestand."""
     if not OUTRO_PATH.exists():
-        print("Waarschuwing: outro.mp3 niet gevonden, outro overgeslagen.")
+        logger.warning("outro.mp3 niet gevonden op %s, outro overgeslagen", OUTRO_PATH)
         return
 
     try:
@@ -61,5 +69,6 @@ def _append_outro(audio_path: Path):
         outro = AudioSegment.from_mp3(OUTRO_PATH)
         combined = podcast + outro
         combined.export(audio_path, format="mp3", bitrate="128k")
+        logger.debug("Outro toegevoegd: podcast=%.1fs + outro=%.1fs", podcast.duration_seconds, outro.duration_seconds)
     except Exception as e:
-        print(f"Waarschuwing: outro toevoegen mislukt ({e}), episode zonder outro opgeslagen.")
+        logger.warning("Outro toevoegen mislukt (%s), episode zonder outro opgeslagen", e)

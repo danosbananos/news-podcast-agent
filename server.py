@@ -1,5 +1,6 @@
 """FastAPI server voor de nieuws-naar-podcast pipeline."""
 
+import logging
 import os
 import re
 import uuid
@@ -9,6 +10,15 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# Logging configureren — LOG_LEVEL via env var instelbaar (default: INFO)
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+    force=True,
+)
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -45,6 +55,8 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 
+logger.info("Config geladen: BASE_URL=%s, AUDIO_DIR=%s", BASE_URL, AUDIO_DIR)
+
 
 # --- Startup / Shutdown ---
 
@@ -55,6 +67,8 @@ def _delete_audio_file(filename: str | None):
     """Verwijder een audiobestand van disk als het bestaat."""
     if filename:
         path = AUDIO_DIR / filename
+        if path.exists():
+            logger.debug("Audiobestand verwijderd: %s", path)
         path.unlink(missing_ok=True)
 
 
@@ -64,7 +78,9 @@ async def _cleanup_old_episodes():
     for ep in episodes:
         _delete_audio_file(ep.audio_filename)
     if episodes:
-        print(f"[cleanup] {len(episodes)} episode(s) ouder dan {RETENTION_DAYS} dagen verwijderd.", flush=True)
+        logger.info("Cleanup: %d episode(s) ouder dan %d dagen verwijderd", len(episodes), RETENTION_DAYS)
+    else:
+        logger.debug("Cleanup: geen oude episodes gevonden")
 
 
 async def _cleanup_orphaned_episodes():
@@ -72,19 +88,25 @@ async def _cleanup_orphaned_episodes():
     episodes = await list_episodes(limit=200)
     orphaned = [ep for ep in episodes if ep.audio_filename and not (AUDIO_DIR / ep.audio_filename).exists()]
     for ep in orphaned:
+        logger.debug("Orphaned episode verwijderd: %s (%s)", ep.title, ep.id)
         await delete_episode(ep.id)
     if orphaned:
-        print(f"[cleanup] {len(orphaned)} episode(s) zonder audiobestand verwijderd.", flush=True)
+        logger.info("Cleanup: %d episode(s) zonder audiobestand verwijderd", len(orphaned))
+    else:
+        logger.debug("Cleanup: geen orphaned episodes gevonden")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Server start — audio_dir=%s, retention=%d dagen", AUDIO_DIR, RETENTION_DAYS)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     await init_db()
     # Ruim op bij elke (her)start
     await _cleanup_old_episodes()
     await _cleanup_orphaned_episodes()
+    logger.info("Server klaar voor requests")
     yield
+    logger.info("Server stopt")
 
 
 app = FastAPI(
@@ -108,9 +130,11 @@ app.add_middleware(
 async def verify_api_key(request: Request):
     """Controleer de Bearer token op beveiligde endpoints."""
     if not API_KEY:
+        logger.debug("Auth overgeslagen — geen API_KEY geconfigureerd")
         return  # Geen key ingesteld = geen auth (alleen voor development)
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer ") or auth[7:] != API_KEY:
+        logger.warning("Ongeldige API-key poging van %s op %s", request.client.host if request.client else "?", request.url.path)
         raise HTTPException(status_code=401, detail="Ongeldige of ontbrekende API-key")
 
 
@@ -144,13 +168,18 @@ class EpisodeResponse(BaseModel):
 
 async def process_article(episode_id: uuid.UUID, article: dict):
     """Verwerk een artikel: genereer script → audio → update database."""
+    title = article.get("title", "?")
+    logger.info("Verwerking gestart: episode=%s titel='%s'", episode_id, title)
     try:
         # Stap 1: Podcastscript genereren
+        logger.info("Stap 1/3: Script genereren voor '%s'", title)
         script = generate_script(article, api_key=ANTHROPIC_API_KEY)
+        logger.info("Script gegenereerd: %d karakters, %d woorden", len(script), len(script.split()))
 
         await update_episode(episode_id, script=script)
 
         # Stap 2: Audio genereren
+        logger.info("Stap 2/3: Audio genereren voor '%s'", title)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = (article.get("title", "podcast") or "podcast")[:50]
         import unicodedata
@@ -170,6 +199,7 @@ async def process_article(episode_id: uuid.UUID, article: dict):
         # Stap 3: Duur schatten (~150 woorden per minuut bij TTS)
         word_count = len(script.split())
         duration_seconds = int(word_count / 150 * 60)
+        logger.info("Stap 3/3: Episode afronden — duur=%ds, bestand=%s", duration_seconds, filename)
 
         await update_episode(
             episode_id,
@@ -177,9 +207,10 @@ async def process_article(episode_id: uuid.UUID, article: dict):
             duration_seconds=duration_seconds,
             status=EpisodeStatus.completed,
         )
+        logger.info("Verwerking voltooid: episode=%s titel='%s'", episode_id, title)
 
     except Exception as e:
-        traceback.print_exc()
+        logger.error("Verwerking mislukt: episode=%s titel='%s' fout=%s", episode_id, title, e, exc_info=True)
         await update_episode(
             episode_id,
             status=EpisodeStatus.failed,
@@ -192,8 +223,11 @@ async def process_article(episode_id: uuid.UUID, article: dict):
 @app.post("/submit", response_model=SubmitResponse, dependencies=[Depends(verify_api_key)])
 async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
     """Stuur een artikel in voor verwerking."""
+    logger.info("POST /submit — url=%s, text=%s chars, title='%s'", req.url, len(req.text) if req.text else 0, req.title)
+
     # Validatie: minstens text of url moet aanwezig zijn
     if not req.text and not req.url:
+        logger.warning("Submit afgewezen: geen text of url meegegeven")
         raise HTTPException(
             status_code=400,
             detail="Geef minstens 'text' of 'url' mee.",
@@ -203,15 +237,21 @@ async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
     if req.url:
         url_match = re.search(r'https?://\S+', req.url)
         if url_match:
-            req.url = url_match.group(0)
+            cleaned_url = url_match.group(0)
+            if cleaned_url != req.url:
+                logger.debug("URL opgeschoond: '%s' → '%s'", req.url, cleaned_url)
+            req.url = cleaned_url
 
     # Tekstextractie
     try:
         if req.text:
+            logger.debug("Extractie via meegegeven tekst (%d chars)", len(req.text))
             article = from_text(req.text, title=req.title or "", source=req.source or "")
         else:
+            logger.debug("Extractie via URL: %s", req.url)
             article = from_url(req.url)
     except ValueError as e:
+        logger.warning("Extractie mislukt: %s", e)
         raise HTTPException(status_code=422, detail=str(e))
 
     # Override metadata met request-waarden als die meegegeven zijn
@@ -227,6 +267,7 @@ async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
         source=article.get("source"),
         source_url=req.url,
     )
+    logger.info("Episode aangemaakt: id=%s, titel='%s', bron=%s", episode.id, article.get("title"), article.get("source"))
 
     # Verwerking op de achtergrond starten
     background_tasks.add_task(process_article, episode.id, article)
@@ -246,7 +287,9 @@ async def upload_pdf(
     source: Optional[str] = None,
 ):
     """Upload een PDF voor verwerking."""
+    logger.info("POST /upload — bestand='%s', title='%s'", file.filename, title)
     if not file.filename or not file.filename.lower().endswith(".pdf"):
+        logger.warning("Upload afgewezen: geen PDF — '%s'", file.filename)
         raise HTTPException(status_code=400, detail="Alleen PDF-bestanden worden geaccepteerd.")
 
     # Sla PDF tijdelijk op
@@ -254,10 +297,12 @@ async def upload_pdf(
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
+    logger.debug("PDF opgeslagen als temp: %s (%d bytes)", tmp_path, len(content))
 
     try:
         article = from_pdf(tmp_path)
     except ValueError as e:
+        logger.warning("PDF extractie mislukt: %s", e)
         raise HTTPException(status_code=422, detail=str(e))
     finally:
         Path(tmp_path).unlink(missing_ok=True)
@@ -272,6 +317,7 @@ async def upload_pdf(
         title=article.get("title", "Zonder titel"),
         source=source,
     )
+    logger.info("Episode aangemaakt vanuit PDF: id=%s, titel='%s'", episode.id, article.get("title"))
 
     background_tasks.add_task(process_article, episode.id, article)
 
@@ -286,6 +332,7 @@ async def upload_pdf(
 async def get_feed():
     """Serveer de podcast RSS feed (publiek, geen auth)."""
     episodes = await list_episodes(limit=50)
+    logger.debug("Feed gegenereerd met %d episodes", len(episodes))
     xml = generate_feed(episodes, base_url=BASE_URL)
     return Response(content=xml, media_type="application/rss+xml; charset=utf-8")
 
@@ -359,6 +406,7 @@ async def delete_episode_endpoint(episode_id: str):
         raise HTTPException(status_code=404, detail="Aflevering niet gevonden")
 
     _delete_audio_file(episode.audio_filename)
+    logger.info("Episode verwijderd: id=%s, titel='%s'", episode_id, episode.title)
     return {"status": "deleted", "title": episode.title}
 
 

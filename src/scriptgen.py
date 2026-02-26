@@ -1,7 +1,11 @@
 """Podcastscript genereren met Claude Haiku + grammaticacontrole."""
 
+import logging
+
 import anthropic
 import httpx
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 Je bent een redacteur voor een persoonlijke nieuwspodcast in het Nederlands.
@@ -58,6 +62,7 @@ def generate_script(
     Returns:
         Podcastscript als string
     """
+    logger.info("Scriptgeneratie gestart: model=%s, titel='%s'", model, article.get("title", "?"))
     client = anthropic.Anthropic(api_key=api_key)
 
     # Bouw de user-prompt op met beschikbare metadata
@@ -71,6 +76,7 @@ def generate_script(
     parts.append(f"\nArtikel:\n{article['text']}")
 
     user_prompt = "\n".join(parts)
+    logger.debug("Prompt opgebouwd: %d chars (artikel: %d chars)", len(user_prompt), len(article.get("text", "")))
 
     message = client.messages.create(
         model=model,
@@ -80,6 +86,11 @@ def generate_script(
     )
 
     script = message.content[0].text
+    usage = message.usage
+    logger.info(
+        "Claude response ontvangen: script=%d chars, input_tokens=%d, output_tokens=%d",
+        len(script), usage.input_tokens, usage.output_tokens,
+    )
 
     # Grammaticacontrole via LanguageTool
     script = _fix_grammar(script)
@@ -94,6 +105,7 @@ def _fix_grammar(text: str) -> str:
     grammaticacontrole. Past automatisch correcties toe (bijv. 'sprang' → 'sprong').
     Bij fouten wordt de originele tekst ongewijzigd teruggegeven.
     """
+    logger.debug("Grammaticacontrole gestart (%d chars)", len(text))
     try:
         response = httpx.post(
             "https://api.languagetool.org/v2/check",
@@ -107,14 +119,18 @@ def _fix_grammar(text: str) -> str:
         response.raise_for_status()
         matches = response.json().get("matches", [])
     except Exception as e:
-        print(f"[grammar] LanguageTool API niet bereikbaar ({e}), overgeslagen.", flush=True)
+        logger.warning("LanguageTool API niet bereikbaar (%s), grammaticacontrole overgeslagen", e)
         return text
 
     if not matches:
+        logger.debug("Geen grammaticafouten gevonden")
         return text
+
+    logger.info("LanguageTool: %d mogelijke correcties gevonden", len(matches))
 
     # Pas correcties toe van achteren naar voren (zodat offsets kloppen)
     corrected = text
+    applied = 0
     for match in sorted(matches, key=lambda m: m["offset"], reverse=True):
         replacements = match.get("replacements", [])
         if not replacements:
@@ -124,6 +140,8 @@ def _fix_grammar(text: str) -> str:
         fix = replacements[0]["value"]  # Eerste suggestie is meestal de beste
         original = corrected[offset:offset + length]
         corrected = corrected[:offset] + fix + corrected[offset + length:]
-        print(f"[grammar] '{original}' → '{fix}' ({match.get('rule', {}).get('id', '?')})", flush=True)
+        logger.info("Grammatica: '%s' → '%s' (regel: %s)", original, fix, match.get("rule", {}).get("id", "?"))
+        applied += 1
 
+    logger.info("Grammaticacontrole voltooid: %d correcties toegepast", applied)
     return corrected

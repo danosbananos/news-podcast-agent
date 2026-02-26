@@ -17,8 +17,9 @@ Gebruik:
 """
 
 import argparse
-import sys
+import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -28,8 +29,16 @@ from src.extract import from_url, from_pdf, from_text
 from src.scriptgen import generate_script
 from src.tts import generate_audio
 
+logger = logging.getLogger(__name__)
+
 
 def main():
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+    )
+
     _env_file = Path(__file__).parent / "secrets.env"
     if _env_file.exists():
         load_dotenv(_env_file)
@@ -64,29 +73,26 @@ def main():
     voice_id = os.getenv("ELEVENLABS_VOICE_ID")
 
     if not anthropic_key:
-        print("Fout: ANTHROPIC_API_KEY niet gevonden. Zet deze in secrets.env of als omgevingsvariabele.")
+        logger.error("ANTHROPIC_API_KEY niet gevonden in secrets.env of omgevingsvariabelen")
         sys.exit(1)
 
     if not args.script_only:
         if not elevenlabs_key:
-            print("Fout: ELEVENLABS_API_KEY niet gevonden. Zet deze in secrets.env of als omgevingsvariabele.")
+            logger.error("ELEVENLABS_API_KEY niet gevonden in secrets.env of omgevingsvariabelen")
             sys.exit(1)
         if not voice_id:
-            print("Fout: ELEVENLABS_VOICE_ID niet gevonden. Zet deze in secrets.env of als omgevingsvariabele.")
-            print("Tip: ga naar https://elevenlabs.io/voice-library en kies een stem.")
-            print("     Het voice ID vind je in de URL of via de API.")
+            logger.error("ELEVENLABS_VOICE_ID niet gevonden. Tip: https://elevenlabs.io/voice-library")
             sys.exit(1)
 
     # --- Stap 1: Tekstextractie ---
-    print("📄 Tekst extraheren...")
+    logger.info("Stap 1/3: Tekst extraheren...")
     try:
         if args.url:
             article = from_url(args.url)
-            print(f"   Bron: {article.get('source', 'onbekend')}")
-            print(f"   Titel: {article.get('title', 'onbekend')}")
+            logger.info("Bron: %s, Titel: %s", article.get("source", "onbekend"), article.get("title", "onbekend"))
         elif args.pdf:
             article = from_pdf(args.pdf)
-            print(f"   PDF: {args.pdf}")
+            logger.info("PDF: %s", args.pdf)
         elif args.stdin:
             text = sys.stdin.read()
             article = from_text(text, title=args.title, source=args.source)
@@ -99,26 +105,26 @@ def main():
         if args.source:
             article["source"] = args.source
 
-        print(f"   Tekstlengte: {len(article['text'])} karakters")
+        logger.info("Tekstlengte: %d karakters", len(article["text"]))
     except (ValueError, FileNotFoundError) as e:
-        print(f"Fout bij extractie: {e}")
+        logger.error("Extractie mislukt: %s", e)
         sys.exit(1)
 
     # --- Stap 2: Podcastscript genereren ---
-    print("\n🎙️  Podcastscript genereren (Claude Haiku)...")
+    logger.info("Stap 2/3: Podcastscript genereren (Claude Haiku)...")
     try:
         script = generate_script(article, api_key=anthropic_key)
-        print(f"   Scriptlengte: {len(script)} karakters")
-        print(f"\n--- Script ---\n{script}\n--- Einde script ---\n")
+        logger.info("Scriptlengte: %d karakters", len(script))
+        logger.debug("Script:\n%s", script)
     except Exception as e:
-        print(f"Fout bij scriptgeneratie: {e}")
+        logger.error("Scriptgeneratie mislukt: %s", e)
         sys.exit(1)
 
     if args.script_only:
         return
 
     # --- Stap 3: Text-to-Speech ---
-    print("🔊 Audio genereren (ElevenLabs)...")
+    logger.info("Stap 3/3: Audio genereren (ElevenLabs)...")
     if args.output:
         output_path = args.output
     else:
@@ -138,9 +144,9 @@ def main():
             api_key=elevenlabs_key,
             voice_id=voice_id,
         )
-        print(f"\n✅ Klaar! Aflevering opgeslagen: {path}")
+        logger.info("Klaar! Aflevering opgeslagen: %s", path)
     except Exception as e:
-        print(f"Fout bij audiogeneratie: {e}")
+        logger.error("Audiogeneratie mislukt: %s", e)
         sys.exit(1)
 
 
