@@ -145,8 +145,19 @@ Push-notificaties naar telefoon via ntfy.sh bij succes en falen van episode-verw
 ElevenLabs Starter-plan heeft een limiet van 30.000 characters/maand.
 
 ### Oplossing
-Fallback-keten in `src/tts.py`: ElevenLabs → Google Cloud TTS (WaveNet).
-- Google Cloud TTS WaveNet: 1M chars/maand gratis, goede Nederlandse stemmen
-- Voice: `nl-NL-Wavenet-F` (instelbaar via `GOOGLE_TTS_VOICE`)
+12Drielaagse fallback-keten in `src/tts.py`: ElevenLabs → Gemini Flash TTS → WaveNet.
+
+**Gemini Flash TTS (eerste fallback):**
+- Style prompt: configureerbaar via `GOOGLE_TTS_STYLE_PROMPT` (default: podcast-presentator toon)
+- Voice: `Kore` (instelbaar via `GOOGLE_TTS_GEMINI_VOICE`)
+- Veel natuurlijker dan WaveNet dankzij LLM-gestuurde intonatie
+- Betaald ($0.50/$10 per 1M tokens in/out), maar $300 startcredits
+
+**WaveNet (tweede fallback):**
+- Voice: `nl-NL-Wavenet-F` (instelbaar via `GOOGLE_TTS_WAVENET_VOICE`)
+- 1M chars/maand gratis — betrouwbare gratis vangneet
+
+**Chunking:**
+- Google TTS API's hebben limieten per request (4000/5000 bytes)
+- Scripts worden opgesplitst op alineagrenzen, audio per chunk gegenereerd en samengevoegd via pydub
 - Credentials via `GOOGLE_TTS_CREDENTIALS_B64` (base64-encoded service account JSON)
-- Zonder die env var werkt alleen ElevenLabs (geen breaking change)

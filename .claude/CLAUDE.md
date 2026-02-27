@@ -6,7 +6,7 @@ A personal news-to-podcast pipeline that converts news articles into podcast epi
 ## Architecture
 - **Server**: FastAPI (`server.py`) with SQLAlchemy + PostgreSQL
 - **Script generation**: Claude Haiku 4.5 (`src/scriptgen.py`) with LanguageTool post-processing for Dutch grammar
-- **TTS**: ElevenLabs multilingual v2 → Google Cloud TTS WaveNet fallback (`src/tts.py`) with outro sound appended via pydub/ffmpeg
+- **TTS**: ElevenLabs → Gemini Flash TTS (with style prompt) → WaveNet fallback (`src/tts.py`) with chunking + outro via pydub/ffmpeg
 - **Feed**: Apple Podcasts-compatible RSS (`src/feed.py`)
 - **Extraction**: trafilatura for URLs, pdfplumber for PDFs (`src/extract.py`)
 - **Notifications**: Push via ntfy.sh (`src/notify.py`) — success + failure alerts to phone
@@ -24,7 +24,8 @@ A personal news-to-podcast pipeline that converts news articles into podcast epi
 - LanguageTool public API for grammar checking (no Java dependency, free tier sufficient for personal use)
 - Cleanup on startup instead of cron (sufficient for personal project, Railway restarts on each deploy)
 - CORS enabled for bookmarklet cross-origin requests (endpoints protected by API key)
-- ElevenLabs → Google Cloud TTS fallback chain (graceful degradation when ElevenLabs quota is exceeded)
+- Three-tier TTS fallback: ElevenLabs → Gemini Flash TTS (style prompt) → WaveNet (graceful degradation)
+- Google TTS providers use chunking to handle scripts longer than 4000/5000 byte API limit
 - Ntfy.sh for push notifications (no account needed, topic-based, optional via NTFY_TOPIC env var)
 - Google Cloud credentials stored as base64-encoded env var (GOOGLE_TTS_CREDENTIALS_B64) for containerized deployment
 - Secrets consolidated in `secret_files/.env` (gitignored), Railway uses platform env vars
