@@ -1,4 +1,4 @@
-secrets.env
+secret_files/
 output/
 __pycache__/
 *.pyc

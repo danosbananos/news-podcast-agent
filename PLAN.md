@@ -98,3 +98,55 @@ Gebruik twee ElevenLabs-stemmen (host + gast) voor interview-artikelen:
 ### Open vragen
 - Automatische interview-detectie vs. handmatige keuze door gebruiker?
 - Welke tweede stem? (Ander geslacht/karakter voor duidelijk onderscheid)
+
+---
+
+## 6. Engelse stem bij Engelstalig artikel
+**Status:** Todo
+**Prioriteit:** Laag | **Effort:** Medium
+
+Automatisch de juiste TTS-stem en taal kiezen op basis van de taal van het artikel. Moet nog uitgewerkt worden.
+
+---
+
+## 7. Share-integraties (Shortcuts, bookmarklet, setup-pagina)
+**Status:** Done
+**Prioriteit:** Hoog | **Effort:** Medium
+
+### Oplossing
+- **Apple Shortcuts**: Twee opdrachten — "Naar Podcast" (URL-only, alle apps) en "Naar Podcast (Safari)" (paywall-route via Safari Reader)
+- **Desktop bookmarklet**: JavaScript one-liner die artikeltekst + URL naar `/submit` POST
+- **Setup-pagina** (`/setup`): Publieke HTML-pagina met stap-voor-stap instructies, configureerbare bookmarklet, en feed-URL
+- Shortcuts bevatten If/Otherwise error-handling die de server-response toont bij fouten
+
+### Bestanden
+- `static/setup.html` — setup-pagina
+- `server.py` — `/setup` endpoint
+
+---
+
+## 8. Push-notificaties via ntfy
+**Status:** Done
+**Prioriteit:** Medium | **Effort:** Laag
+
+### Oplossing
+Push-notificaties naar telefoon via ntfy.sh bij succes en falen van episode-verwerking.
+- `src/notify.py` — ntfy helper module
+- Geconfigureerd via `NTFY_TOPIC` env var (optioneel — zonder wordt het overgeslagen)
+- Error messages worden gesanitized: alleen exception type + eerste regel, max 200 chars
+
+---
+
+## 9. Google Cloud TTS als fallback
+**Status:** Done
+**Prioriteit:** Hoog | **Effort:** Medium
+
+### Probleem
+ElevenLabs Starter-plan heeft een limiet van 30.000 characters/maand.
+
+### Oplossing
+Fallback-keten in `src/tts.py`: ElevenLabs → Google Cloud TTS (WaveNet).
+- Google Cloud TTS WaveNet: 1M chars/maand gratis, goede Nederlandse stemmen
+- Voice: `nl-NL-Wavenet-F` (instelbaar via `GOOGLE_TTS_VOICE`)
+- Credentials via `GOOGLE_TTS_CREDENTIALS_B64` (base64-encoded service account JSON)
+- Zonder die env var werkt alleen ElevenLabs (geen breaking change)

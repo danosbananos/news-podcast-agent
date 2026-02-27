@@ -39,7 +39,7 @@ def main():
         level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
     )
 
-    _env_file = Path(__file__).parent / "secrets.env"
+    _env_file = Path(__file__).parent / "secret_files" / ".env"
     if _env_file.exists():
         load_dotenv(_env_file)
 
@@ -73,12 +73,12 @@ def main():
     voice_id = os.getenv("ELEVENLABS_VOICE_ID")
 
     if not anthropic_key:
-        logger.error("ANTHROPIC_API_KEY niet gevonden in secrets.env of omgevingsvariabelen")
+        logger.error("ANTHROPIC_API_KEY niet gevonden in secret_files/.env of omgevingsvariabelen")
         sys.exit(1)
 
     if not args.script_only:
         if not elevenlabs_key:
-            logger.error("ELEVENLABS_API_KEY niet gevonden in secrets.env of omgevingsvariabelen")
+            logger.error("ELEVENLABS_API_KEY niet gevonden in secret_files/.env of omgevingsvariabelen")
             sys.exit(1)
         if not voice_id:
             logger.error("ELEVENLABS_VOICE_ID niet gevonden. Tip: https://elevenlabs.io/voice-library")

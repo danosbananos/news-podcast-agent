@@ -58,7 +58,7 @@
   <label for="api-url">Server URL</label>
   <input type="text" id="api-url" class="config-input" value="" placeholder="https://your-server.up.railway.app">
   <label for="api-key">API Key</label>
-  <input type="text" id="api-key" class="config-input" placeholder="jouw-api-key">
+  <input type="password" id="api-key" class="config-input" placeholder="jouw-api-key">
   <p class="note">Vul je server URL en API key in — de bookmarklet en instructies hieronder worden automatisch bijgewerkt.</p>
 </div>
 
@@ -124,23 +124,54 @@
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">6</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
+  <div class="step-header"><span class="step-number">6</span> <span class="step-action">Stel variabele in</span></div>
+  <div class="step-detail">Naam: <code>response</code><br>Waarde: <code>Inhoud van URL</code> <span class="note">(het resultaat van stap 5)</span></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">7</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
   <div class="step-detail">
-    Sleutel: <code>message</code><br>
+    Sleutel: <code>message</code> van variabele <code>response</code><br>
     <span class="note">Zoek op "woordenboek".</span>
   </div>
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">7</span> <span class="step-action">Toon waarschuwing</span></div>
+  <div class="step-header"><span class="step-number">8</span> <span class="step-action">Als</span></div>
   <div class="step-detail">
-    Input: <code>Woordenboekwaarde</code> <span class="note">(het resultaat van stap 6)</span>
+    Conditie: <code>Woordenboekwaarde</code> <strong>heeft waarde</strong><br>
+    <span class="note">Zoek op "Als". Dit checkt of de server een succesbericht teruggaf.</span>
   </div>
+</div>
+
+<div class="step-group">
+  <div class="step-group-label">Succes</div>
+  <div class="step">
+    <div class="step-header"><span class="step-number">9</span> <span class="step-action">Toon waarschuwing</span></div>
+    <div class="step-detail">Input: <code>Woordenboekwaarde</code> <span class="note">(het bericht uit stap 7)</span></div>
+  </div>
+</div>
+
+<div class="step-group step-group-alt">
+  <div class="step-group-label">Anders</div>
+  <div class="step">
+    <div class="step-header"><span class="step-number">10</span> <span class="step-action">Toon waarschuwing</span></div>
+    <div class="step-detail">
+      Titel: <code>Fout</code><br>
+      Input: variabele <code>response</code><br>
+      <span class="note">Toont de volledige server-response. Bij een bekende fout zie je de foutmelding, bij een onverwachte response (timeout, server down) zie je wat er terug kwam — handig voor debuggen.</span>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">11</span> <span class="step-action">Einde als</span></div>
+  <div class="step-detail"><span class="note">Sluit het Als/Anders-blok af.</span></div>
 </div>
 
 <div class="card">
   <p><strong>Gebruik:</strong> Open een artikel in NRC, NYT, NOS of elke andere app → deelknop → <strong>"Naar Podcast"</strong></p>
-  <p class="note">Werkt voor gratis artikelen. Bij paywalled content krijg je een foutmelding — gebruik dan Opdracht 2 via Safari.</p>
+  <p class="note">Werkt voor gratis artikelen. Bij paywalled content krijg je een duidelijke foutmelding — gebruik dan Opdracht 2 via Safari.</p>
 </div>
 
 <!-- ==================== SHORTCUT 2 ==================== -->
@@ -228,23 +259,53 @@
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">10</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
+  <div class="step-header"><span class="step-number">10</span> <span class="step-action">Stel variabele in</span></div>
+  <div class="step-detail">Naam: <code>response</code><br>Waarde: <code>Inhoud van URL</code> <span class="note">(het resultaat van stap 9)</span></div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">11</span> <span class="step-action">Haal woordenboekwaarde op</span></div>
   <div class="step-detail">
-    Sleutel: <code>message</code><br>
+    Sleutel: <code>message</code> van variabele <code>response</code><br>
     <span class="note">Zoek op "woordenboek".</span>
   </div>
 </div>
 
 <div class="step">
-  <div class="step-header"><span class="step-number">11</span> <span class="step-action">Toon waarschuwing</span></div>
+  <div class="step-header"><span class="step-number">12</span> <span class="step-action">Als</span></div>
   <div class="step-detail">
-    Input: <code>Woordenboekwaarde</code> <span class="note">(het resultaat van stap 10)</span>
+    Conditie: <code>Woordenboekwaarde</code> <strong>heeft waarde</strong>
   </div>
+</div>
+
+<div class="step-group">
+  <div class="step-group-label">Succes</div>
+  <div class="step">
+    <div class="step-header"><span class="step-number">13</span> <span class="step-action">Toon waarschuwing</span></div>
+    <div class="step-detail">Input: <code>Woordenboekwaarde</code></div>
+  </div>
+</div>
+
+<div class="step-group step-group-alt">
+  <div class="step-group-label">Anders</div>
+  <div class="step">
+    <div class="step-header"><span class="step-number">14</span> <span class="step-action">Toon waarschuwing</span></div>
+    <div class="step-detail">
+      Titel: <code>Fout</code><br>
+      Input: variabele <code>response</code><br>
+      <span class="note">Toont de volledige server-response — bij een bekende fout zie je de melding, bij een onverwachte response (timeout, server down) zie je wat er terug kwam.</span>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-header"><span class="step-number">15</span> <span class="step-action">Einde als</span></div>
+  <div class="step-detail"><span class="note">Sluit het Als/Anders-blok af.</span></div>
 </div>
 
 <div class="card">
   <p><strong>Gebruik:</strong> Open een artikel in Safari (waar je ingelogd bent bij NRC/NYT) → deelknop → <strong>"Naar Podcast (Safari)"</strong></p>
-  <p class="note">Safari Reader extraheert de volledige tekst, ook achter paywalls.</p>
+  <p class="note">Safari Reader extraheert de volledige tekst, ook achter paywalls. Bij fouten zie je nu een duidelijke melding.</p>
 </div>
 
 <hr>
@@ -293,7 +354,11 @@ function getBookmarkletCode(apiUrl, apiKey) {
     },
     body:JSON.stringify({url:u,text:t,title:n,source:s})
   })
-  .then(function(r){return r.json()})
+  .then(function(r){
+    var ct=r.headers.get('content-type')||'';
+    if(ct.indexOf('json')!==-1) return r.json();
+    return r.text().then(function(txt){return {detail:r.status+': '+txt.substring(0,200)}})
+  })
   .then(function(d){alert(d.message||d.detail||'Verstuurd!')})
   .catch(function(e){alert('Fout: '+e.message)})
 }())`;

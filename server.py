@@ -38,11 +38,12 @@ from src.database import (
 )
 from src.extract import from_pdf, from_text, from_url
 from src.feed import generate_feed
+from src.notify import send as notify
 from src.scriptgen import generate_script
 from src.tts import generate_audio
 
-# Load secrets.env lokaal; op Railway staan env vars in het platform
-_env_file = Path(__file__).parent / "secrets.env"
+# Load .env lokaal; op Railway staan env vars in het platform
+_env_file = Path(__file__).parent / "secret_files" / ".env"
 if _env_file.exists():
     load_dotenv(_env_file)
 
@@ -208,13 +209,27 @@ async def process_article(episode_id: uuid.UUID, article: dict):
             status=EpisodeStatus.completed,
         )
         logger.info("Verwerking voltooid: episode=%s titel='%s'", episode_id, title)
+        notify(
+            title=f"Podcast klaar: {title}",
+            message=f"Duur: {duration_seconds // 60}m{duration_seconds % 60:02d}s",
+            tags="white_check_mark,podcast",
+        )
 
     except Exception as e:
         logger.error("Verwerking mislukt: episode=%s titel='%s' fout=%s", episode_id, title, e, exc_info=True)
+        # Sanitize: alleen het type en de eerste regel bewaren, geen stack traces
+        # of interne paden naar de client/ntfy sturen
+        safe_msg = f"{type(e).__name__}: {str(e).splitlines()[0][:200]}"
         await update_episode(
             episode_id,
             status=EpisodeStatus.failed,
-            error_message=str(e),
+            error_message=safe_msg,
+        )
+        notify(
+            title=f"Podcast mislukt: {title}",
+            message=safe_msg,
+            priority="high",
+            tags="warning,podcast",
         )
 
 
