@@ -25,24 +25,41 @@ _BROWSER_HEADERS = {
 _SUPPORTED_LANGUAGES = {"nl", "en", "de"}
 
 # Bekende Britse domeinen — als het domein hierin voorkomt, wordt "en" → "en-GB"
-# Alles onder .uk wordt automatisch herkend; deze set is voor .com-domeinen
+# Alles onder .uk wordt automatisch herkend; deze set is voor .com-domeinen.
+# Houd deze lijst bewust conservatief om false positives te beperken.
 _UK_DOMAINS_COM = {
     "bbc.com",
     "theguardian.com",
     "thetimes.com",
     "ft.com",
     "economist.com",
-    "reuters.com",
 }
 
 
 def _normalize_domain(value: str | None) -> str:
-    """Normaliseer URL of domeinnaam naar een kaal domein zonder www."""
+    """Normaliseer URL of domeinnaam naar een kaal domein zonder www.
+
+    Ondersteunt o.a.:
+    - https://www.bbc.com/news
+    - bbc.com/news
+    - bbc.com
+    """
     if not value:
         return ""
-    parsed = urlparse(value)
-    hostname = parsed.hostname or value
-    return hostname.removeprefix("www.").lower()
+
+    raw = value.strip().strip("()[]<>.,;:!?\"'").lower()
+    if not raw or " " in raw:
+        return ""
+
+    # urlparse ziet "bbc.com/news" zonder schema niet als hostname; prefix schema.
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    hostname = (parsed.hostname or "").removeprefix("www.")
+
+    # Alleen plausibele domeinen accepteren.
+    if "." not in hostname or hostname.startswith(".") or hostname.endswith("."):
+        return ""
+
+    return hostname
 
 
 def _detect_language(text: str, url: str | None = None, source: str | None = None) -> str:
