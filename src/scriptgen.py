@@ -1,6 +1,7 @@
 """Podcastscript genereren met Claude Haiku + grammaticacontrole."""
 
 import logging
+import re
 
 import anthropic
 import httpx
@@ -22,6 +23,14 @@ _LANGUAGETOOL_CODES = {
     "en-GB": "en-GB",
     "de": "de-DE",
 }
+
+# Beperk automatische LT-edits om inhoudsschade te voorkomen.
+_MAX_LT_APPLIED = 20
+_LEXICAL_RULE_PREFIXES = (
+    "MORFOLOGIK_RULE",
+    "HUNSPELL_RULE",
+)
+_WORD_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ'-]+$")
 
 SYSTEM_PROMPT = """\
 You are an editor for a personal news podcast.
@@ -181,13 +190,20 @@ def _fix_grammar(text: str, language: str = "nl") -> str:
 
     logger.info("LanguageTool: %d mogelijke correcties gevonden", len(matches))
 
-    # Pas correcties toe van achteren naar voren (zodat offsets kloppen)
+    # Pas veilige correcties toe van achteren naar voren (zodat offsets kloppen)
     corrected = text
     applied = 0
     for match in sorted(matches, key=lambda m: m["offset"], reverse=True):
-        replacements = match.get("replacements", [])
-        if not replacements:
+        if applied >= _MAX_LT_APPLIED:
+            logger.info("Grammaticacontrole: maximum van %d correcties bereikt", _MAX_LT_APPLIED)
+            break
+
+        should_apply, reason = _should_apply_lt_match(match, corrected)
+        if not should_apply:
+            logger.debug("Grammaticacorrectie overgeslagen (%s)", reason)
             continue
+
+        replacements = match.get("replacements", [])
         offset = match["offset"]
         length = match["length"]
         fix = replacements[0]["value"]  # Eerste suggestie is meestal de beste
@@ -198,3 +214,49 @@ def _fix_grammar(text: str, language: str = "nl") -> str:
 
     logger.info("Grammaticacontrole voltooid: %d correcties toegepast", applied)
     return corrected
+
+
+def _should_apply_lt_match(match: dict, text: str) -> tuple[bool, str]:
+    """Filter LanguageTool matches: alleen laag-risico correcties automatisch toepassen."""
+    replacements = match.get("replacements", [])
+    if not replacements:
+        return False, "geen vervanging"
+
+    offset = match.get("offset")
+    length = match.get("length")
+    if not isinstance(offset, int) or not isinstance(length, int) or offset < 0 or length < 0:
+        return False, "ongeldige offset"
+    if offset + length > len(text):
+        return False, "offset buiten tekst"
+
+    original = text[offset:offset + length]
+    fix = replacements[0].get("value", "")
+    if not fix or fix == original:
+        return False, "lege of identieke vervanging"
+
+    rule_id = match.get("rule", {}).get("id", "")
+    if any(rule_id.startswith(prefix) for prefix in _LEXICAL_RULE_PREFIXES):
+        return False, f"lexicale regel ({rule_id})"
+
+    # Vermijd grotere herformuleringen; alleen single-token edits.
+    if len(original.split()) != 1 or len(fix.split()) != 1:
+        return False, "multi-token vervanging"
+
+    # Vermijd edits op eigennamen/acroniemen en numerieke tokens.
+    if any(ch.isdigit() for ch in original + fix):
+        return False, "numerieke token"
+    if original.isupper() or fix.isupper():
+        return False, "hoofdlettertoken"
+
+    original_word = original.strip(".,;:!?()[]{}\"'`")
+    fix_word = fix.strip(".,;:!?()[]{}\"'`")
+    if not original_word or not fix_word:
+        return False, "lege woordkern"
+    if not _WORD_RE.fullmatch(original_word) or not _WORD_RE.fullmatch(fix_word):
+        return False, "niet-woordtoken"
+    if not original_word.islower() or not fix_word.islower():
+        return False, "mogelijk eigennaam"
+    if abs(len(fix_word) - len(original_word)) > 3:
+        return False, "te grote lengtesprong"
+
+    return True, "veilig"
