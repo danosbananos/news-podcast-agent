@@ -61,6 +61,7 @@ logger.info("Config geladen: BASE_URL=%s, AUDIO_DIR=%s", BASE_URL, AUDIO_DIR)
 # --- Startup / Shutdown ---
 
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "14"))
+NOTIFY_ON_DEPLOY = os.getenv("NOTIFY_ON_DEPLOY", "true").lower() in {"1", "true", "yes", "on"}
 
 
 def _delete_audio_file(filename: str | None):
@@ -105,6 +106,15 @@ async def lifespan(app: FastAPI):
     await _cleanup_old_episodes()
     await _cleanup_orphaned_episodes()
     logger.info("Server klaar voor requests")
+    if NOTIFY_ON_DEPLOY:
+        commit = os.getenv("RAILWAY_GIT_COMMIT_SHA", "")[:7]
+        release = os.getenv("RAILWAY_RELEASE_ID", "")
+        deploy_ref = commit or release or "onbekend"
+        notify(
+            title="Deployment voltooid",
+            message=f"Server klaar op {BASE_URL} (deploy: {deploy_ref})",
+            tags="rocket,server",
+        )
     yield
     logger.info("Server stopt")
 
