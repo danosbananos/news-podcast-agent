@@ -123,7 +123,7 @@ Engelstalige en Duitstalige artikelen worden nu voorgelezen met een Nederlandse 
 
 ### Beslissingen
 - Taaldetectie via `langdetect` (lichtgewicht, betrouwbaar, geen API-call)
-- Nederlandse intro-zin, rest in oorspronkelijke taal
+- Geen Nederlandstalige intro bij niet-Nederlandse artikelen; volledig script blijft in brontaal
 - Eén Engelstalige prompt met taal-parameter (geen aparte prompts per taal)
 
 ### Open vragen
@@ -161,7 +161,70 @@ Gebruik twee stemmen (host + gast) voor interview-artikelen:
 
 ---
 
-## 7. Share-integraties (Shortcuts, bookmarklet, setup-pagina)
+## 7. Per-episode artwork in RSS feed
+**Status:** Done
+**Prioriteit:** Medium | **Effort:** Medium
+
+### Probleem
+Alle episodes tonen dezelfde feed-artwork in Apple Podcasts. Visueel onderscheid per aflevering ontbreekt.
+
+### Oplossing
+Per episode een eigen thumbnail tonen via `<itunes:image>` op item-niveau in de RSS feed.
+
+**Afbeeldingsbronnen (fallback-keten):**
+1. `doc.image` uit trafilatura (hoofdafbeelding van het artikel)
+2. `og:image` uit HTML meta tags
+3. Clearbit logo van het brondomein (`https://logo.clearbit.com/{domain}`)
+
+**Verwerking (`src/episode_image.py`):**
+- Download remote image, converteer naar vierkante JPEG (1400x1400, center crop via Pillow)
+- Sla lokaal op in `EPISODE_IMAGE_DIR` en serveer via `/episode-images/{filename}`
+- Apple Podcasts vereist vierkante artwork — rechthoekige og:images worden gecenter-cropped
+
+**Database:**
+- `image_url` kolom op `episodes` tabel (VARCHAR 2000, nullable)
+- Lichtgewicht migratie via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` bij startup
+
+### Bestanden
+| File | Actie |
+|---|---|
+| `src/extract.py` | og:image extractie, Clearbit logo fallback |
+| `src/episode_image.py` | Download, crop, JPEG-conversie |
+| `src/feed.py` | `<itunes:image>` per item |
+| `src/database.py` | `image_url` kolom + migratie |
+| `server.py` | `/episode-images/` endpoint, cleanup bij delete |
+
+### Beperking
+- Bij privé RSS-feeds (niet via Apple Podcasts Connect) toont Apple Podcasts episode-artwork niet altijd betrouwbaar
+
+---
+
+## 8. VTT transcript pipeline
+**Status:** Done
+**Prioriteit:** Laag | **Effort:** Medium
+
+### Probleem
+Geen transcripten beschikbaar voor afleveringen.
+
+### Oplossing
+WebVTT transcripten genereren en koppelen via Podcasting 2.0 `<podcast:transcript>` tag in de RSS feed.
+
+**Modi (`TRANSCRIPT_MODE` env var):**
+- `none` (default) — geen transcript
+- `heuristic` — timing op basis van woordtelling en geschatte duur
+- `whisper_api` — OpenAI Whisper API voor echte tijdstempels, met heuristic fallback
+
+**Bestanden:**
+- `src/transcript.py` — transcriptgeneratie
+- `src/feed.py` — `<podcast:transcript>` tag
+- `server.py` — `/transcripts/{filename}` endpoint
+
+### Beperking
+- Apple Podcasts toont transcripten alleen voor shows in de Apple-catalogus (via Podcasts Connect), niet voor privé RSS-feeds
+
+---
+
+## 9. Share-integraties (Shortcuts, bookmarklet, setup-pagina)
 **Status:** Done
 **Prioriteit:** Hoog | **Effort:** Medium
 
@@ -177,19 +240,20 @@ Gebruik twee stemmen (host + gast) voor interview-artikelen:
 
 ---
 
-## 8. Push-notificaties via ntfy
+## 10. Push-notificaties via ntfy
 **Status:** Done
 **Prioriteit:** Medium | **Effort:** Laag
 
 ### Oplossing
-Push-notificaties naar telefoon via ntfy.sh bij succes en falen van episode-verwerking.
+Push-notificaties naar telefoon via ntfy.sh bij succes, falen, en deploys.
 - `src/notify.py` — ntfy helper module
 - Geconfigureerd via `NTFY_TOPIC` env var (optioneel — zonder wordt het overgeslagen)
 - Error messages worden gesanitized: alleen exception type + eerste regel, max 200 chars
+- Deploy-notificatie bij serverstart met commit SHA (`NOTIFY_ON_DEPLOY`, default: `true`)
 
 ---
 
-## 9. Google Cloud TTS als fallback
+## 11. Google Cloud TTS als fallback
 **Status:** Done
 **Prioriteit:** Hoog | **Effort:** Medium
 
@@ -213,3 +277,27 @@ Drielaagse fallback-keten in `src/tts.py`: ElevenLabs → Gemini Flash TTS → W
 - Google TTS API's hebben limieten per request (4000/5000 bytes)
 - Scripts worden opgesplitst op alineagrenzen, audio per chunk gegenereerd en samengevoegd via pydub
 - Credentials via `GOOGLE_TTS_CREDENTIALS_B64` (base64-encoded service account JSON)
+
+---
+
+## 12. Procesbesluiten (overwogen en verworpen opties)
+**Status:** Vastgelegd
+
+### Gekozen
+- **Episode-art lokaal hosten** (vierkante JPEGs) in plaats van alleen externe `og:image`-URLs; dit is betrouwbaarder voor podcast-clients.
+- **`HEAD` ondersteunen op feed/assets** (`/feed.xml`, `/audio/*`, `/episode-images/*`, `/transcripts/*`) voor crawler-compatibiliteit.
+- **Conservatieve UK-domeinverfijning met expliciete uitzonderingen** (zoals `theguardian.com`), zodat herkenning van Brits Engels stabiel blijft.
+- **Transcripten als VTT + RSS-linking** als technische basis, met `heuristic` of `whisper_api`.
+
+### Verworpen of bijgesteld
+- **Niet gekozen:** “alleen en-GB bij duidelijke UK URL-signalen”.  
+  Reden: te streng; gewenste bronnen zoals The Guardian moeten standaard als en-GB kunnen vallen.
+- **Niet gekozen:** Nederlandstalige intro voor niet-Nederlandse artikelen.  
+  Reden: onnatuurlijk en inconsistent met brontaalweergave.
+- **Niet gekozen als blokkade:** langdetect non-determinisme als apart risicoproject.  
+  Reden: lage impact voor dit project; seed is gezet, verdere uitwerking niet geprioriteerd.
+- **Niet gekozen voor privégebruik:** publicatie via Apple Podcasts Connect als vereiste route.  
+  Reden: doel is privé RSS-gebruik; wel geaccepteerd dat Apple-features (transcripten, episode-art) in de app dan beperkt/inconsistent kunnen zijn.
+
+### Geaccepteerde beperkingen
+- Bij privé RSS-feeds in Apple Podcasts zijn transcripten niet zichtbaar en episode-artwork kan inconsistent zijn, ook als de feed technisch correct is.
