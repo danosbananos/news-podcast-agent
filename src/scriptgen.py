@@ -18,6 +18,16 @@ of gangbare leenwoorden die in het Nederlands geen goed alternatief hebben (bijv
 - Let op correct lidwoordgebruik: "het artikel", "de krant", "het onderzoek", "de politie". \
 Gebruik bij twijfel het meest gangbare lidwoord.
 - Korte zinnen, actieve vorm. Geen jargon zonder uitleg.
+- Gebruik interpunctie actief om ritme en intonatie te sturen:
+  - Gedachtestreepjes (—) voor een korte ademhalingspauze of bijzin.
+  - Ellipsen (...) voor een dramatische of nadenkende pauze.
+  - Komma's en puntkomma's voor natuurlijke rustmomenten.
+  - Retorische vragen voor betrokkenheid ("Maar waarom eigenlijk?").
+- Wissel lange en korte zinnen af. Een korte zin na een lange trekt de aandacht.
+- Stuur klemtoon via woordvolgorde: plaats het belangrijkste woord aan het einde of begin van de zin. \
+"Het gaat om honderd miljard dollar" legt nadruk op het bedrag. \
+"Honderd miljard dollar — dat is waar het om gaat" legt nadruk op de conclusie. \
+Vermijd zinnen waar het kernwoord weggestopt zit in het midden.
 - Schrijf getallen voluit (vijftien miljoen, niet 15.000.000).
 - Schrijf afkortingen voluit bij eerste gebruik \
 (NATO wordt "de NAVO, de Noord-Atlantische Verdragsorganisatie").
@@ -41,6 +51,8 @@ Afsluiting:
 
 Lengte en format:
 - Houd de lengte onder de 2 minuten leestijd (maximaal ~1.500 karakters).
+- Verdeel het script in korte alinea's (3-5 zinnen per alinea), gescheiden door een witregel. \
+Elke alinea behandelt één punt of aspect van het verhaal. De witregels zorgen voor natuurlijke pauzes bij het voorlezen.
 - Geef ALLEEN het uitgesproken script terug als platte tekst.
 - Gebruik GEEN markdown, geen kopjes, geen opsommingstekens, geen scheidingslijnen.
 - Gebruik GEEN placeholders zoals [bron] of [datum] — als informatie ontbreekt, laat het weg.

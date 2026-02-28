@@ -5,7 +5,7 @@ A personal news-to-podcast pipeline that converts news articles into podcast epi
 
 ## Architecture
 - **Server**: FastAPI (`server.py`) with SQLAlchemy + PostgreSQL
-- **Script generation**: Claude Haiku 4.5 (`src/scriptgen.py`) with LanguageTool post-processing for Dutch grammar
+- **Script generation**: Claude Haiku 4.5 (`src/scriptgen.py`) with LanguageTool post-processing for Dutch grammar. Prompt optimized for TTS: punctuation-driven pacing, paragraph structure, word-order emphasis.
 - **TTS**: ElevenLabs → Gemini Flash TTS (with style prompt) → WaveNet fallback (`src/tts.py`) with chunking + outro via pydub/ffmpeg
 - **Feed**: Apple Podcasts-compatible RSS (`src/feed.py`)
 - **Extraction**: trafilatura for URLs, pdfplumber for PDFs (`src/extract.py`)

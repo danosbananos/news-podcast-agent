@@ -12,6 +12,9 @@ Verscherp de system prompt in `src/scriptgen.py` in plaats van een apart validat
 - Expliciete instructie: "Gebruik geen Engelse woorden tenzij het eigennamen of gangbare leenwoorden zijn"
 - Expliciete instructie: "Controleer correct lidwoordgebruik (de/het)"
 - Instructie voor natuurlijke spreektaal: korte zinnen, geen ambtelijk taalgebruik
+- Interpunctie-sturing voor TTS: gedachtestreepjes, ellipsen, retorische vragen
+- Alinea-structuur: 3-5 zinnen per alinea, gescheiden door witregels (zorgt voor pauzes in TTS én splitspunten voor chunking)
+- Klemtoon via woordvolgorde: kernwoord aan begin of einde van de zin plaatsen
 
 ### Escalatiepad
 Als prompt-aanpassingen onvoldoende zijn, upgrade naar Sonnet (`claude-sonnet-4-20250514`). Eén betere call is goedkoper dan twee aparte calls (generatie + validatie).
@@ -145,7 +148,7 @@ Push-notificaties naar telefoon via ntfy.sh bij succes en falen van episode-verw
 ElevenLabs Starter-plan heeft een limiet van 30.000 characters/maand.
 
 ### Oplossing
-12Drielaagse fallback-keten in `src/tts.py`: ElevenLabs → Gemini Flash TTS → WaveNet.
+Drielaagse fallback-keten in `src/tts.py`: ElevenLabs → Gemini Flash TTS → WaveNet.
 
 **Gemini Flash TTS (eerste fallback):**
 - Style prompt: configureerbaar via `GOOGLE_TTS_STYLE_PROMPT` (default: podcast-presentator toon)
