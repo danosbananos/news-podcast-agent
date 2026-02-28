@@ -16,6 +16,11 @@ GOOGLE_TTS_CREDENTIALS_B64 = os.getenv("GOOGLE_TTS_CREDENTIALS_B64", "")
 
 # --- Per-taal voice configuratie ---
 
+
+def _lang_value(values: dict[str, str], language: str, fallback: str = "nl") -> str:
+    """Haal taalwaarde op met nette fallback."""
+    return values.get(language) or values.get(fallback, "")
+
 # ElevenLabs voice IDs per taal (multilingual v2 model spreekt alle talen)
 _ELEVENLABS_VOICE_IDS = {
     "nl": os.getenv("ELEVENLABS_VOICE_ID", ""),
@@ -47,6 +52,12 @@ _WAVENET_VOICES = {
 }
 
 # Style prompts per taal voor Gemini TTS
+_STYLE_PROMPT_EN = (
+    "Read in a neutral, calm newsreader style. "
+    "Keep expression restrained and avoid dramatic emphasis. "
+    "Use steady pacing with short, natural pauses between paragraphs."
+)
+
 _STYLE_PROMPTS = {
     "nl": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT",
@@ -56,15 +67,11 @@ _STYLE_PROMPTS = {
     ),
     "en": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT_EN",
-        "Read in a neutral, calm newsreader style. "
-        "Keep expression restrained and avoid dramatic emphasis. "
-        "Use steady pacing with short, natural pauses between paragraphs.",
+        _STYLE_PROMPT_EN,
     ),
     "en-GB": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT_EN_GB",
-        "Read in a neutral, calm newsreader style. "
-        "Keep expression restrained and avoid dramatic emphasis. "
-        "Use steady pacing with short, natural pauses between paragraphs.",
+        _STYLE_PROMPT_EN,
     ),
     "de": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT_DE",
@@ -96,7 +103,7 @@ def generate_audio(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     # Bepaal de taal-specifieke voice ID voor ElevenLabs
-    el_voice = _ELEVENLABS_VOICE_IDS.get(language) or voice_id
+    el_voice = _lang_value(_ELEVENLABS_VOICE_IDS, language) or voice_id
 
     # 1. ElevenLabs (primair)
     if api_key and el_voice:
@@ -169,9 +176,9 @@ def _generate_gemini_tts(script: str, out: Path, language: str = "nl"):
     from google.cloud import texttospeech
     from google.oauth2 import service_account
 
-    gemini_voice = _GEMINI_VOICES.get(language, _GEMINI_VOICES["nl"])
-    gemini_lang = _GEMINI_LANG_CODES.get(language, "nl-NL")
-    style_prompt = _STYLE_PROMPTS.get(language, _STYLE_PROMPTS["nl"])
+    gemini_voice = _lang_value(_GEMINI_VOICES, language)
+    gemini_lang = _lang_value(_GEMINI_LANG_CODES, language, fallback="nl") or "nl-NL"
+    style_prompt = _lang_value(_STYLE_PROMPTS, language)
 
     logger.info(
         "TTS gestart (Gemini Flash): voice=%s, lang=%s, script=%d chars",
@@ -215,7 +222,7 @@ def _generate_wavenet(script: str, out: Path, language: str = "nl"):
     from google.cloud import texttospeech
     from google.oauth2 import service_account
 
-    wavenet_voice = _WAVENET_VOICES.get(language, _WAVENET_VOICES["nl"])
+    wavenet_voice = _lang_value(_WAVENET_VOICES, language)
     language_code = "-".join(wavenet_voice.split("-")[:2])
 
     logger.info("TTS gestart (WaveNet): voice=%s, script=%d chars", wavenet_voice, len(script))
