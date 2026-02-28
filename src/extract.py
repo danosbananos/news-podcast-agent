@@ -3,7 +3,7 @@
 import logging
 import re
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 import pdfplumber
@@ -89,6 +89,45 @@ def _detect_language(text: str, url: str | None = None, source: str | None = Non
         return "nl"
 
 
+def _extract_og_image(html: str) -> str:
+    """Haal de og:image URL uit HTML meta tags."""
+    # property="og:image" content="..."
+    match = re.search(
+        r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\'>]+)',
+        html, re.IGNORECASE,
+    )
+    if not match:
+        # content="..." property="og:image" (omgekeerde volgorde)
+        match = re.search(
+            r'<meta[^>]*content=["\']([^"\'>]+)["\'][^>]*property=["\']og:image',
+            html, re.IGNORECASE,
+        )
+    return match.group(1) if match else ""
+
+
+def _normalize_image_url(image_url: str | None, page_url: str) -> str:
+    """Normaliseer image URL naar absolute http(s) URL."""
+    if not image_url:
+        return ""
+    img = image_url.strip()
+    if img.startswith("//"):
+        img = f"https:{img}"
+    elif img.startswith("/"):
+        img = urljoin(page_url, img)
+    parsed = urlparse(img)
+    if parsed.scheme not in ("http", "https"):
+        return ""
+    return img
+
+
+def _logo_fallback_url(url: str | None = None, source: str | None = None) -> str:
+    """Fallback-logo op basis van domein via Clearbit."""
+    domain = _normalize_domain(url) or _normalize_domain(source)
+    if not domain:
+        return ""
+    return f"https://logo.clearbit.com/{domain}"
+
+
 def _extract_html_title(html: str) -> str:
     """Haal de <title> tag uit HTML als fallback."""
     match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
@@ -154,9 +193,15 @@ def from_url(url: str) -> dict:
     # Gebruik trafilatura-metadata, met fallbacks voor title en source
     title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
     source = (doc.sitename if doc else None) or _domain_to_source(url)
+    image_url = (doc.image if doc else None) or _extract_og_image(downloaded)
+    image_url = _normalize_image_url(image_url, page_url=url)
+    if not image_url:
+        image_url = _logo_fallback_url(url=url, source=source)
 
     language = _detect_language(text, url=url)
     logger.info("URL extractie voltooid: titel='%s', bron=%s, taal=%s, tekst=%d chars", title, source, language, len(text))
+    if image_url:
+        logger.info("Afbeelding gevonden: %s", image_url[:100])
 
     return {
         "text": text,
@@ -165,6 +210,7 @@ def from_url(url: str) -> dict:
         "source": source,
         "date": (doc.date if doc else None) or "",
         "language": language,
+        "image_url": image_url,
     }
 
 
@@ -199,5 +245,6 @@ def from_text(text: str, title: str = "", source: str = "") -> dict:
         logger.warning("Tekst te kort: %d chars (minimaal 50)", len(text.strip()))
         raise ValueError("Tekst is te kort om een podcastscript van te maken.")
     language = _detect_language(text, source=source)
+    image_url = _logo_fallback_url(source=source)
     logger.info("Tekst-extractie: titel='%s', bron='%s', taal=%s, %d chars", title, source, language, len(text))
-    return {"text": text, "title": title, "source": source, "language": language}
+    return {"text": text, "title": title, "source": source, "language": language, "image_url": image_url}

@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from email.utils import format_datetime
 from pathlib import Path
+from urllib.parse import urlparse
 from xml.etree.ElementTree import Element, SubElement, ElementTree, register_namespace, tostring
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,11 @@ def generate_feed(episodes: list, base_url: str) -> str:
         SubElement(item, f"{{{ITUNES_NS}}}author").text = podcast_author
         SubElement(item, f"{{{ITUNES_NS}}}explicit").text = "no"
 
+        # Episode-specifieke afbeelding (og:image van het bronartikel)
+        if _is_valid_image_url(ep.image_url):
+            ep_img = SubElement(item, f"{{{ITUNES_NS}}}image")
+            ep_img.set("href", ep.image_url)
+
         # GUID (uniek per aflevering)
         guid = SubElement(item, "guid", isPermaLink="false")
         guid.text = str(ep.id)
@@ -142,3 +148,11 @@ def _get_file_size(audio_filename: str) -> int:
     if path.exists():
         return path.stat().st_size
     return 0
+
+
+def _is_valid_image_url(url: str | None) -> bool:
+    """Controleer of image URL bruikbaar is voor RSS clients."""
+    if not url:
+        return False
+    parsed = urlparse(url)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)

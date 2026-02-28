@@ -281,6 +281,7 @@ async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
         title=article.get("title", "Zonder titel"),
         source=article.get("source"),
         source_url=req.url,
+        image_url=article.get("image_url"),
     )
     logger.info("Episode aangemaakt: id=%s, titel='%s', bron=%s", episode.id, article.get("title"), article.get("source"))
 
@@ -331,6 +332,7 @@ async def upload_pdf(
         article_text=article["text"],
         title=article.get("title", "Zonder titel"),
         source=source,
+        image_url=article.get("image_url"),
     )
     logger.info("Episode aangemaakt vanuit PDF: id=%s, titel='%s'", episode.id, article.get("title"))
 

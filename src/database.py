@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, Enum, Integer, String, Text, select
+from sqlalchemy import Column, DateTime, Enum, Integer, String, Text, select, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -36,6 +36,7 @@ class Episode(Base):
     title = Column(String(500), nullable=False, default="Zonder titel")
     source = Column(String(200), nullable=True)
     source_url = Column(String(2000), nullable=True)
+    image_url = Column(String(2000), nullable=True)
     article_text = Column(Text, nullable=False)
     script = Column(Text, nullable=True)
     audio_filename = Column(String(500), nullable=True)
@@ -106,6 +107,10 @@ async def init_db():
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # Lichtgewicht schema-migratie voor bestaande installaties.
+                await conn.execute(
+                    text("ALTER TABLE episodes ADD COLUMN IF NOT EXISTS image_url VARCHAR(2000)")
+                )
             logger.info("Database tabellen aangemaakt/geverifieerd")
             return
         except Exception as e:
@@ -124,6 +129,7 @@ async def create_episode(
     title: str = "Zonder titel",
     source: Optional[str] = None,
     source_url: Optional[str] = None,
+    image_url: Optional[str] = None,
 ) -> Episode:
     """Maak een nieuw episode-record aan met status 'processing'."""
     session_factory = get_session_factory()
@@ -132,6 +138,7 @@ async def create_episode(
             title=title,
             source=source,
             source_url=source_url,
+            image_url=image_url,
             article_text=article_text,
             status=EpisodeStatus.processing,
         )
