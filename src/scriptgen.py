@@ -71,13 +71,11 @@ Do NOT mention the date if it's missing.
 - If the source is missing, start directly with the topic."""
 
 _INTRO_OTHER = """\
-- Start with a SHORT Dutch intro sentence (one sentence only) that names the source \
-and topic, e.g. "Uit de New York Times vandaag, een artikel over kunstmatige intelligentie." \
-or "Der Spiegel bericht over de Duitse verkiezingen."
-- After this single Dutch intro sentence, write the ENTIRE rest of the script in {language_name}.
+- Start in {language_name} immediately and keep the ENTIRE script in {language_name}.
 - Do NOT start with the same opening sentence every time. Vary the intro.
+- Weave the source and topic naturally into the first sentence.
 - If a date is available, incorporate it naturally. Do NOT mention the date if it's missing.
-- If the source is missing, start the Dutch intro with the topic directly."""
+- If the source is missing, start directly with the topic."""
 
 
 def generate_script(

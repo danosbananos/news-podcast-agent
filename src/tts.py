@@ -50,27 +50,27 @@ _WAVENET_VOICES = {
 _STYLE_PROMPTS = {
     "nl": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT",
-        "Lees voor als een professionele podcast-presentator. "
-        "Rustige, betrokken toon. Varieer je intonatie en leg nadruk op belangrijke woorden. "
-        "Neem korte pauzes tussen alinea's.",
+        "Lees voor in een neutrale, rustige nieuwsleestoon. "
+        "Beperk expressie en emotionele variatie. "
+        "Gebruik gelijkmatig tempo met korte, natuurlijke pauzes tussen alinea's.",
     ),
     "en": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT_EN",
-        "Read as a professional podcast host. "
-        "Calm, engaged tone. Vary your intonation and emphasize key words. "
-        "Take short pauses between paragraphs.",
+        "Read in a neutral, calm newsreader style. "
+        "Keep expression restrained and avoid dramatic emphasis. "
+        "Use steady pacing with short, natural pauses between paragraphs.",
     ),
     "en-GB": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT_EN_GB",
-        "Read as a professional podcast host. "
-        "Calm, engaged tone. Vary your intonation and emphasize key words. "
-        "Take short pauses between paragraphs.",
+        "Read in a neutral, calm newsreader style. "
+        "Keep expression restrained and avoid dramatic emphasis. "
+        "Use steady pacing with short, natural pauses between paragraphs.",
     ),
     "de": os.getenv(
         "GOOGLE_TTS_STYLE_PROMPT_DE",
-        "Lies vor wie ein professioneller Podcast-Moderator. "
-        "Ruhiger, engagierter Ton. Variiere deine Intonation und betone wichtige Wörter. "
-        "Mache kurze Pausen zwischen Absätzen.",
+        "Lies in einem neutralen, ruhigen Nachrichtenton vor. "
+        "Halte die Ausdrucksstärke zurück und vermeide dramatische Betonung. "
+        "Verwende ein gleichmäßiges Tempo mit kurzen, natürlichen Pausen zwischen Absätzen.",
     ),
 }
 

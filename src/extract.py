@@ -36,7 +36,16 @@ _UK_DOMAINS_COM = {
 }
 
 
-def _detect_language(text: str, url: str | None = None) -> str:
+def _normalize_domain(value: str | None) -> str:
+    """Normaliseer URL of domeinnaam naar een kaal domein zonder www."""
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    hostname = parsed.hostname or value
+    return hostname.removeprefix("www.").lower()
+
+
+def _detect_language(text: str, url: str | None = None, source: str | None = None) -> str:
     """Detecteer de taal van een tekst. Retourneert taalcode ('nl', 'en', 'en-GB', 'de').
 
     Voor Engelstalige teksten van bekende UK-domeinen wordt 'en-GB' teruggegeven.
@@ -47,10 +56,9 @@ def _detect_language(text: str, url: str | None = None) -> str:
         if lang not in _SUPPORTED_LANGUAGES:
             logger.info("Taal '%s' niet ondersteund, fallback naar 'nl'", lang)
             return "nl"
-        # Verfijn Engels naar en-GB als het domein Brits is
-        if lang == "en" and url:
-            hostname = urlparse(url).hostname or ""
-            domain = hostname.removeprefix("www.")
+        # Verfijn Engels naar en-GB als het domein Brits is (via url of source)
+        if lang == "en":
+            domain = _normalize_domain(url) or _normalize_domain(source)
             if domain.endswith(".uk") or domain in _UK_DOMAINS_COM:
                 logger.info("Taal gedetecteerd: en-GB (domein %s)", domain)
                 return "en-GB"
@@ -170,6 +178,6 @@ def from_text(text: str, title: str = "", source: str = "") -> dict:
     if len(text.strip()) < 50:
         logger.warning("Tekst te kort: %d chars (minimaal 50)", len(text.strip()))
         raise ValueError("Tekst is te kort om een podcastscript van te maken.")
-    language = _detect_language(text)
+    language = _detect_language(text, source=source)
     logger.info("Tekst-extractie: titel='%s', bron='%s', taal=%s, %d chars", title, source, language, len(text))
     return {"text": text, "title": title, "source": source, "language": language}
