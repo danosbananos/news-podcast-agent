@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 # iTunes namespace — registreer vóór het bouwen van elementen
 ITUNES_NS = "http://www.itunes.com/dtds/podcast-1.0.dtd"
+PODCAST_NS = "https://podcastindex.org/namespace/1.0"
 register_namespace("itunes", ITUNES_NS)
+register_namespace("podcast", PODCAST_NS)
 register_namespace("content", "http://purl.org/rss/1.0/modules/content/")
 
 
@@ -108,6 +110,16 @@ def generate_feed(episodes: list, base_url: str) -> str:
             minutes, seconds = divmod(ep.duration_seconds, 60)
             SubElement(item, f"{{{ITUNES_NS}}}duration").text = f"{minutes}:{seconds:02d}"
 
+        # Getimede transcriptreferentie (Podcasting 2.0)
+        transcript_filename = _transcript_filename_for_audio(ep.audio_filename)
+        if transcript_filename and _get_transcript_size(transcript_filename) > 0:
+            transcript_url = f"{base_url}/transcripts/{transcript_filename}"
+            transcript = SubElement(item, f"{{{PODCAST_NS}}}transcript")
+            transcript.set("url", transcript_url)
+            transcript.set("type", "text/vtt")
+            transcript.set("rel", "captions")
+            transcript.set("language", podcast_language)
+
         # Audio enclosure
         if ep.audio_filename:
             audio_url = f"{base_url}/audio/{ep.audio_filename}"
@@ -145,6 +157,23 @@ def _get_file_size(audio_filename: str) -> int:
     """Haal de bestandsgrootte op van een mp3-bestand."""
     audio_dir = os.getenv("AUDIO_DIR", "./output")
     path = Path(audio_dir) / audio_filename
+    if path.exists():
+        return path.stat().st_size
+    return 0
+
+
+def _transcript_filename_for_audio(audio_filename: str | None) -> str | None:
+    """Converteer audio bestandsnaam naar transcript bestandsnaam."""
+    if not audio_filename:
+        return None
+    return f"{Path(audio_filename).stem}.vtt"
+
+
+def _get_transcript_size(transcript_filename: str) -> int:
+    """Haal de bestandsgrootte op van een transcriptbestand."""
+    audio_dir = Path(os.getenv("AUDIO_DIR", "./output"))
+    transcript_dir = Path(os.getenv("TRANSCRIPT_DIR", str(audio_dir / "transcripts")))
+    path = transcript_dir / transcript_filename
     if path.exists():
         return path.stat().st_size
     return 0

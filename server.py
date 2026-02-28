@@ -42,6 +42,7 @@ from src.episode_image import process_episode_image
 from src.feed import generate_feed
 from src.notify import send as notify
 from src.scriptgen import generate_script
+from src.transcript import generate_transcript
 from src.tts import generate_audio
 
 # Load .env lokaal; op Railway staan env vars in het platform
@@ -53,10 +54,13 @@ if _env_file.exists():
 
 AUDIO_DIR = Path(os.getenv("AUDIO_DIR", "./output"))
 EPISODE_IMAGE_DIR = Path(os.getenv("EPISODE_IMAGE_DIR", str(AUDIO_DIR / "episode-images")))
+TRANSCRIPT_DIR = Path(os.getenv("TRANSCRIPT_DIR", str(AUDIO_DIR / "transcripts")))
+TRANSCRIPT_MODE = os.getenv("TRANSCRIPT_MODE", "none")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 API_KEY = os.getenv("API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+TRANSCRIPT_OPENAI_API_KEY = os.getenv("TRANSCRIPT_OPENAI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
 
 logger.info("Config geladen: BASE_URL=%s, AUDIO_DIR=%s", BASE_URL, AUDIO_DIR)
 
@@ -74,6 +78,17 @@ def _delete_audio_file(filename: str | None):
         if path.exists():
             logger.debug("Audiobestand verwijderd: %s", path)
         path.unlink(missing_ok=True)
+
+
+def _delete_transcript_file(audio_filename: str | None):
+    """Verwijder transcriptbestand (VTT) gekoppeld aan audiobestand."""
+    if not audio_filename:
+        return
+    stem = Path(audio_filename).stem
+    path = TRANSCRIPT_DIR / f"{stem}.vtt"
+    if path.exists():
+        logger.debug("Transcriptbestand verwijderd: %s", path)
+    path.unlink(missing_ok=True)
 
 
 def _delete_episode_image_file(image_url: str | None):
@@ -110,6 +125,7 @@ async def _cleanup_old_episodes():
     episodes = await delete_episodes_older_than(days=RETENTION_DAYS)
     for ep in episodes:
         _delete_audio_file(ep.audio_filename)
+        _delete_transcript_file(ep.audio_filename)
         _delete_episode_image_file(ep.image_url)
     if episodes:
         logger.info("Cleanup: %d episode(s) ouder dan %d dagen verwijderd", len(episodes), RETENTION_DAYS)
@@ -123,6 +139,7 @@ async def _cleanup_orphaned_episodes():
     orphaned = [ep for ep in episodes if ep.audio_filename and not (AUDIO_DIR / ep.audio_filename).exists()]
     for ep in orphaned:
         logger.debug("Orphaned episode verwijderd: %s (%s)", ep.title, ep.id)
+        _delete_transcript_file(ep.audio_filename)
         _delete_episode_image_file(ep.image_url)
         await delete_episode(ep.id)
     if orphaned:
@@ -136,6 +153,7 @@ async def lifespan(app: FastAPI):
     logger.info("Server start — audio_dir=%s, retention=%d dagen", AUDIO_DIR, RETENTION_DAYS)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     EPISODE_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    TRANSCRIPT_DIR.mkdir(parents=True, exist_ok=True)
     await init_db()
     # Ruim op bij elke (her)start
     await _cleanup_old_episodes()
@@ -217,14 +235,14 @@ async def process_article(episode_id: uuid.UUID, article: dict):
     logger.info("Verwerking gestart: episode=%s titel='%s'", episode_id, title)
     try:
         # Stap 1: Podcastscript genereren
-        logger.info("Stap 1/3: Script genereren voor '%s'", title)
+        logger.info("Stap 1/4: Script genereren voor '%s'", title)
         script = generate_script(article, api_key=ANTHROPIC_API_KEY)
         logger.info("Script gegenereerd: %d karakters, %d woorden", len(script), len(script.split()))
 
         await update_episode(episode_id, script=script)
 
         # Stap 2: Audio genereren
-        logger.info("Stap 2/3: Audio genereren voor '%s'", title)
+        logger.info("Stap 2/4: Audio genereren voor '%s'", title)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = (article.get("title", "podcast") or "podcast")[:50]
         import unicodedata
@@ -245,7 +263,22 @@ async def process_article(episode_id: uuid.UUID, article: dict):
         # Stap 3: Duur schatten (~150 woorden per minuut bij TTS)
         word_count = len(script.split())
         duration_seconds = int(word_count / 150 * 60)
-        logger.info("Stap 3/3: Episode afronden — duur=%ds, bestand=%s", duration_seconds, filename)
+        logger.info("Stap 3/4: Transcript genereren (mode=%s) voor '%s'", TRANSCRIPT_MODE, title)
+        transcript_path = generate_transcript(
+            script=script,
+            audio_path=output_path,
+            output_dir=TRANSCRIPT_DIR,
+            language=language,
+            duration_seconds=duration_seconds,
+            mode=TRANSCRIPT_MODE,
+            openai_api_key=TRANSCRIPT_OPENAI_API_KEY,
+        )
+        if transcript_path:
+            logger.info("Transcript gekoppeld aan episode: %s", transcript_path.name)
+        else:
+            logger.info("Geen transcript gekoppeld (mode=%s)", TRANSCRIPT_MODE)
+
+        logger.info("Stap 4/4: Episode afronden — duur=%ds, bestand=%s", duration_seconds, filename)
 
         await update_episode(
             episode_id,
@@ -465,6 +498,19 @@ async def get_episode_image(filename: str):
     return FileResponse(path, media_type="image/jpeg", filename=filename)
 
 
+@app.get("/transcripts/{filename}")
+async def get_transcript(filename: str):
+    """Serveer transcriptbestand (VTT)."""
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Ongeldige bestandsnaam")
+
+    path = TRANSCRIPT_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Transcript niet gevonden")
+
+    return FileResponse(path, media_type="text/vtt; charset=utf-8", filename=filename)
+
+
 @app.get("/episodes", response_model=list[EpisodeResponse])
 async def get_episodes():
     """Lijst van alle afleveringen (voor debugging/dashboard)."""
@@ -500,6 +546,7 @@ async def delete_episode_endpoint(episode_id: str):
         raise HTTPException(status_code=404, detail="Aflevering niet gevonden")
 
     _delete_audio_file(episode.audio_filename)
+    _delete_transcript_file(episode.audio_filename)
     _delete_episode_image_file(episode.image_url)
     logger.info("Episode verwijderd: id=%s, titel='%s'", episode_id, episode.title)
     return {"status": "deleted", "title": episode.title}
