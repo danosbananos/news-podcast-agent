@@ -8,9 +8,12 @@ from urllib.request import Request, urlopen
 
 import pdfplumber
 import trafilatura
-from langdetect import detect, LangDetectException
+from langdetect import detect, LangDetectException, DetectorFactory
 
 logger = logging.getLogger(__name__)
+
+# Maak langdetect deterministic voor dezelfde inputtekst.
+DetectorFactory.seed = 0
 
 # Browser-achtige headers voor sites met bot-detectie (bijv. NYT)
 _BROWSER_HEADERS = {

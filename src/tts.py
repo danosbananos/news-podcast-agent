@@ -90,7 +90,7 @@ def generate_audio(
     script: str,
     output_path: str,
     api_key: str,
-    voice_id: str,
+    voice_id: str = "",
     model_id: str = "eleven_multilingual_v2",
     language: str = "nl",
 ) -> Path:
