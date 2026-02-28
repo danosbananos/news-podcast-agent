@@ -54,7 +54,6 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 API_KEY = os.getenv("API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 
 logger.info("Config geladen: BASE_URL=%s, AUDIO_DIR=%s", BASE_URL, AUDIO_DIR)
 
@@ -195,7 +194,6 @@ async def process_article(episode_id: uuid.UUID, article: dict):
             script=script,
             output_path=str(output_path),
             api_key=ELEVENLABS_API_KEY,
-            voice_id=ELEVENLABS_VOICE_ID,
             language=language,
         )
 

@@ -85,7 +85,7 @@ Engelstalige en Duitstalige artikelen worden nu voorgelezen met een Nederlandse 
 - **Nederlands artikel** → Nederlands script, Nederlandse stem (huidige flow)
 - **Engels artikel** → Engels script, Engelse stem
 - **Duits artikel** → Duits script, Duitse stem
-- De podcast-intro mag kort in het Nederlands ("Uit de New York Times vandaag, een artikel over..."), maar het artikel zelf blijft in de oorspronkelijke taal
+- Het volledige script blijft in de oorspronkelijke taal (geen Nederlandstalige intro bij niet-Nederlandse artikelen)
 
 ### Oplossing
 
@@ -99,7 +99,7 @@ Engelstalige en Duitstalige artikelen worden nu voorgelezen met een Nederlandse 
 **Stap 2: Scriptgeneratie (`src/scriptgen.py`)**
 - Eén Engelstalige system prompt voor alle talen (Engels werkt het best als instructietaal voor Claude)
 - Voeg de doeltaal toe als parameter: "Write the script in {language}"
-- Voor niet-Nederlandse artikelen: "Begin met een korte Nederlandse intro-zin die de bron noemt, schrijf de rest in {language}"
+- Voor niet-Nederlandse artikelen: schrijf het volledige script in `{language}` (inclusief intro)
 - Voor Nederlandse artikelen: huidige gedrag (alles Nederlands)
 - Geen aparte prompt-varianten per taal nodig
 

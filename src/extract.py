@@ -8,9 +8,12 @@ from urllib.request import Request, urlopen
 
 import pdfplumber
 import trafilatura
-from langdetect import detect, LangDetectException
+from langdetect import detect, LangDetectException, DetectorFactory
 
 logger = logging.getLogger(__name__)
+
+# Maak langdetect deterministic voor dezelfde inputtekst.
+DetectorFactory.seed = 0
 
 # Browser-achtige headers voor sites met bot-detectie (bijv. NYT)
 _BROWSER_HEADERS = {
@@ -25,18 +28,44 @@ _BROWSER_HEADERS = {
 _SUPPORTED_LANGUAGES = {"nl", "en", "de"}
 
 # Bekende Britse domeinen — als het domein hierin voorkomt, wordt "en" → "en-GB"
-# Alles onder .uk wordt automatisch herkend; deze set is voor .com-domeinen
+# Alles onder .uk wordt automatisch herkend; deze set is voor .com-domeinen.
+# Houd deze lijst bewust conservatief om false positives te beperken.
 _UK_DOMAINS_COM = {
     "bbc.com",
     "theguardian.com",
     "thetimes.com",
     "ft.com",
     "economist.com",
-    "reuters.com",
 }
 
 
-def _detect_language(text: str, url: str | None = None) -> str:
+def _normalize_domain(value: str | None) -> str:
+    """Normaliseer URL of domeinnaam naar een kaal domein zonder www.
+
+    Ondersteunt o.a.:
+    - https://www.bbc.com/news
+    - bbc.com/news
+    - bbc.com
+    """
+    if not value:
+        return ""
+
+    raw = value.strip().strip("()[]<>.,;:!?\"'").lower()
+    if not raw or " " in raw:
+        return ""
+
+    # urlparse ziet "bbc.com/news" zonder schema niet als hostname; prefix schema.
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    hostname = (parsed.hostname or "").removeprefix("www.")
+
+    # Alleen plausibele domeinen accepteren.
+    if "." not in hostname or hostname.startswith(".") or hostname.endswith("."):
+        return ""
+
+    return hostname
+
+
+def _detect_language(text: str, url: str | None = None, source: str | None = None) -> str:
     """Detecteer de taal van een tekst. Retourneert taalcode ('nl', 'en', 'en-GB', 'de').
 
     Voor Engelstalige teksten van bekende UK-domeinen wordt 'en-GB' teruggegeven.
@@ -47,10 +76,9 @@ def _detect_language(text: str, url: str | None = None) -> str:
         if lang not in _SUPPORTED_LANGUAGES:
             logger.info("Taal '%s' niet ondersteund, fallback naar 'nl'", lang)
             return "nl"
-        # Verfijn Engels naar en-GB als het domein Brits is
-        if lang == "en" and url:
-            hostname = urlparse(url).hostname or ""
-            domain = hostname.removeprefix("www.")
+        # Verfijn Engels naar en-GB als het domein Brits is (via url of source)
+        if lang == "en":
+            domain = _normalize_domain(url) or _normalize_domain(source)
             if domain.endswith(".uk") or domain in _UK_DOMAINS_COM:
                 logger.info("Taal gedetecteerd: en-GB (domein %s)", domain)
                 return "en-GB"
@@ -170,6 +198,6 @@ def from_text(text: str, title: str = "", source: str = "") -> dict:
     if len(text.strip()) < 50:
         logger.warning("Tekst te kort: %d chars (minimaal 50)", len(text.strip()))
         raise ValueError("Tekst is te kort om een podcastscript van te maken.")
-    language = _detect_language(text)
+    language = _detect_language(text, source=source)
     logger.info("Tekst-extractie: titel='%s', bron='%s', taal=%s, %d chars", title, source, language, len(text))
     return {"text": text, "title": title, "source": source, "language": language}
