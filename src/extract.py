@@ -160,17 +160,22 @@ def _fetch_with_browser_headers(url: str) -> str | None:
         return None
 
 
-def from_url(url: str) -> dict:
-    """Haal artikeltekst op via URL. Gebruikt browser-headers als fallback."""
-    logger.info("URL extractie gestart: %s", url)
+def _download_html(url: str) -> str:
+    """Download HTML via trafilatura, met browser-headers fallback."""
     downloaded = trafilatura.fetch_url(url)
     if not downloaded:
-        # Fallback: sommige sites (NYT) blokkeren trafilatura's headers
         logger.info("trafilatura.fetch_url mislukt, probeer browser-headers voor %s", url)
         downloaded = _fetch_with_browser_headers(url)
     if not downloaded:
         logger.error("Kon pagina niet ophalen (beide methoden mislukt): %s", url)
         raise ValueError(f"Kon pagina niet ophalen: {url}")
+    return downloaded
+
+
+def from_url(url: str) -> dict:
+    """Haal artikeltekst op via URL. Gebruikt browser-headers als fallback."""
+    logger.info("URL extractie gestart: %s", url)
+    downloaded = _download_html(url)
 
     logger.debug("HTML opgehaald: %d bytes van %s", len(downloaded), url)
 
@@ -210,6 +215,40 @@ def from_url(url: str) -> dict:
         "source": source,
         "date": (doc.date if doc else None) or "",
         "language": language,
+        "image_url": image_url,
+    }
+
+
+def from_url_metadata(url: str) -> dict:
+    """Haal metadata uit een URL zonder artikeltekst-validatie.
+
+    Handig als de client al tekst meestuurt, maar we alsnog afbeelding/source willen.
+    """
+    logger.info("URL metadata-extractie gestart: %s", url)
+    downloaded = _download_html(url)
+
+    doc = trafilatura.bare_extraction(
+        downloaded,
+        include_comments=False,
+        include_tables=False,
+        favor_precision=True,
+    )
+
+    title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
+    source = (doc.sitename if doc else None) or _domain_to_source(url)
+    image_url = (doc.image if doc else None) or _extract_og_image(downloaded)
+    image_url = _normalize_image_url(image_url, page_url=url)
+    if not image_url:
+        image_url = _logo_fallback_url(url=url, source=source)
+
+    logger.info(
+        "URL metadata-extractie voltooid: titel='%s', bron=%s, image=%s",
+        title, source, bool(image_url),
+    )
+    return {
+        "title": title,
+        "source": source,
+        "date": (doc.date if doc else None) or "",
         "image_url": image_url,
     }
 
