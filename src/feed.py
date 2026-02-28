@@ -38,7 +38,10 @@ def generate_feed(episodes: list, base_url: str) -> str:
     )
     podcast_author = os.getenv("PODCAST_AUTHOR", "Nieuwspodcast")
     podcast_language = os.getenv("PODCAST_LANGUAGE", "nl")
-    podcast_image = os.getenv("PODCAST_IMAGE_URL", "")
+    podcast_image = os.getenv("PODCAST_IMAGE_URL", "").strip()
+    if not podcast_image:
+        # Apple verwacht channel-artwork; fallback naar lokale standaardcover.
+        podcast_image = f"{base_url}/static/cover.png"
 
     # Root element (namespaces worden via register_namespace afgehandeld)
     rss = Element("rss", {"version": "2.0"})
@@ -78,6 +81,7 @@ def generate_feed(episodes: list, base_url: str) -> str:
     # Episodes als items (alleen episodes met een bestaand audiobestand)
     included = 0
     skipped = 0
+    with_episode_image = 0
     for ep in episodes:
         if not ep.audio_filename or _get_file_size(ep.audio_filename) == 0:
             skipped += 1
@@ -96,6 +100,7 @@ def generate_feed(episodes: list, base_url: str) -> str:
         if _is_valid_image_url(ep.image_url):
             ep_img = SubElement(item, f"{{{ITUNES_NS}}}image")
             ep_img.set("href", ep.image_url)
+            with_episode_image += 1
 
         # GUID (uniek per aflevering)
         guid = SubElement(item, "guid", isPermaLink="false")
@@ -130,7 +135,13 @@ def generate_feed(episodes: list, base_url: str) -> str:
                 "type": "audio/mpeg",
             })
 
-    logger.debug("Feed gegenereerd: %d episodes opgenomen, %d overgeslagen", included, skipped)
+    logger.info(
+        "Feed gegenereerd: episodes=%d, met_episode_image=%d, overgeslagen=%d, channel_image=%s",
+        included,
+        with_episode_image,
+        skipped,
+        podcast_image,
+    )
 
     # Serialize naar string
     xml_bytes = tostring(rss, encoding="unicode", xml_declaration=False)
