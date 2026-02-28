@@ -198,15 +198,26 @@ def from_url(url: str) -> dict:
     # Gebruik trafilatura-metadata, met fallbacks voor title en source
     title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
     source = (doc.sitename if doc else None) or _domain_to_source(url)
-    image_url = (doc.image if doc else None) or _extract_og_image(downloaded)
+    image_source = "none"
+    image_url = doc.image if doc and doc.image else ""
+    if image_url:
+        image_source = "doc.image"
+    else:
+        image_url = _extract_og_image(downloaded)
+        if image_url:
+            image_source = "og:image"
     image_url = _normalize_image_url(image_url, page_url=url)
     if not image_url:
         image_url = _logo_fallback_url(url=url, source=source)
+        if image_url:
+            image_source = "logo_fallback"
 
     language = _detect_language(text, url=url)
     logger.info("URL extractie voltooid: titel='%s', bron=%s, taal=%s, tekst=%d chars", title, source, language, len(text))
     if image_url:
-        logger.info("Afbeelding gevonden: %s", image_url[:100])
+        logger.info("Afbeelding gekozen: bron=%s, url=%s", image_source, image_url[:120])
+    else:
+        logger.info("Geen afbeelding gevonden voor URL: %s", url)
 
     return {
         "text": text,
@@ -236,14 +247,23 @@ def from_url_metadata(url: str) -> dict:
 
     title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
     source = (doc.sitename if doc else None) or _domain_to_source(url)
-    image_url = (doc.image if doc else None) or _extract_og_image(downloaded)
+    image_source = "none"
+    image_url = doc.image if doc and doc.image else ""
+    if image_url:
+        image_source = "doc.image"
+    else:
+        image_url = _extract_og_image(downloaded)
+        if image_url:
+            image_source = "og:image"
     image_url = _normalize_image_url(image_url, page_url=url)
     if not image_url:
         image_url = _logo_fallback_url(url=url, source=source)
+        if image_url:
+            image_source = "logo_fallback"
 
     logger.info(
-        "URL metadata-extractie voltooid: titel='%s', bron=%s, image=%s",
-        title, source, bool(image_url),
+        "URL metadata-extractie voltooid: titel='%s', bron=%s, image=%s, image_bron=%s",
+        title, source, bool(image_url), image_source,
     )
     return {
         "title": title,
@@ -285,5 +305,9 @@ def from_text(text: str, title: str = "", source: str = "") -> dict:
         raise ValueError("Tekst is te kort om een podcastscript van te maken.")
     language = _detect_language(text, source=source)
     image_url = _logo_fallback_url(source=source)
+    if image_url:
+        logger.info("Tekst-extractie afbeelding fallback: bron=logo_fallback, url=%s", image_url[:120])
+    else:
+        logger.info("Tekst-extractie: geen afbeelding fallback beschikbaar (source='%s')", source)
     logger.info("Tekst-extractie: titel='%s', bron='%s', taal=%s, %d chars", title, source, language, len(text))
     return {"text": text, "title": title, "source": source, "language": language, "image_url": image_url}

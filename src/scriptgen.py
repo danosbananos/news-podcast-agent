@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections import Counter
 
 import anthropic
 import httpx
@@ -193,13 +194,16 @@ def _fix_grammar(text: str, language: str = "nl") -> str:
     # Pas veilige correcties toe van achteren naar voren (zodat offsets kloppen)
     corrected = text
     applied = 0
+    skipped_reasons: Counter[str] = Counter()
     for match in sorted(matches, key=lambda m: m["offset"], reverse=True):
         if applied >= _MAX_LT_APPLIED:
             logger.info("Grammaticacontrole: maximum van %d correcties bereikt", _MAX_LT_APPLIED)
+            skipped_reasons["max_applied_bereikt"] += 1
             break
 
         should_apply, reason = _should_apply_lt_match(match, corrected)
         if not should_apply:
+            skipped_reasons[reason] += 1
             logger.debug("Grammaticacorrectie overgeslagen (%s)", reason)
             continue
 
@@ -209,10 +213,15 @@ def _fix_grammar(text: str, language: str = "nl") -> str:
         fix = replacements[0]["value"]  # Eerste suggestie is meestal de beste
         original = corrected[offset:offset + length]
         corrected = corrected[:offset] + fix + corrected[offset + length:]
-        logger.info("Grammatica: '%s' → '%s' (regel: %s)", original, fix, match.get("rule", {}).get("id", "?"))
+        logger.debug("Grammatica: '%s' → '%s' (regel: %s)", original, fix, match.get("rule", {}).get("id", "?"))
         applied += 1
 
-    logger.info("Grammaticacontrole voltooid: %d correcties toegepast", applied)
+    skipped_total = sum(skipped_reasons.values())
+    top_reasons = ", ".join(f"{k}={v}" for k, v in skipped_reasons.most_common(4)) or "geen"
+    logger.info(
+        "Grammaticacontrole voltooid: toegepast=%d, overgeslagen=%d, redenen=%s",
+        applied, skipped_total, top_reasons,
+    )
     return corrected
 
 
