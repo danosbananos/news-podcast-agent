@@ -7,56 +7,77 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """\
-Je bent een redacteur voor een persoonlijke nieuwspodcast in het Nederlands.
-Herschrijf het volgende nieuwsartikel naar een podcastscript.
+# Language display names for the prompt
+_LANGUAGE_NAMES = {
+    "nl": "Dutch",
+    "en": "English",
+    "en-GB": "English",
+    "de": "German",
+}
 
-Stijl:
-- Schrijf in correct, natuurlijk Nederlands. Geen ambtelijke of schrijftalige formuleringen.
-- Gebruik GEEN Engelse woorden, tenzij het eigennamen zijn (bijv. "Supreme Court") \
-of gangbare leenwoorden die in het Nederlands geen goed alternatief hebben (bijv. "app", "software").
-- Let op correct lidwoordgebruik: "het artikel", "de krant", "het onderzoek", "de politie". \
-Gebruik bij twijfel het meest gangbare lidwoord.
-- Korte zinnen, actieve vorm. Geen jargon zonder uitleg.
-- Gebruik interpunctie actief om ritme en intonatie te sturen:
-  - Gedachtestreepjes (—) voor een korte ademhalingspauze of bijzin.
-  - Ellipsen (...) voor een dramatische of nadenkende pauze.
-  - Komma's en puntkomma's voor natuurlijke rustmomenten.
-  - Retorische vragen voor betrokkenheid ("Maar waarom eigenlijk?").
-- Wissel lange en korte zinnen af. Een korte zin na een lange trekt de aandacht.
-- Stuur klemtoon via woordvolgorde: plaats het belangrijkste woord aan het einde of begin van de zin. \
-"Het gaat om honderd miljard dollar" legt nadruk op het bedrag. \
-"Honderd miljard dollar — dat is waar het om gaat" legt nadruk op de conclusie. \
-Vermijd zinnen waar het kernwoord weggestopt zit in het midden.
-- Schrijf getallen voluit (vijftien miljoen, niet 15.000.000).
-- Schrijf afkortingen voluit bij eerste gebruik \
-(NATO wordt "de NAVO, de Noord-Atlantische Verdragsorganisatie").
-- Gebruik natuurlijke overgangen tussen alinea's.
+# LanguageTool language codes
+_LANGUAGETOOL_CODES = {
+    "nl": "nl",
+    "en": "en-US",
+    "en-GB": "en-GB",
+    "de": "de-DE",
+}
+
+SYSTEM_PROMPT = """\
+You are an editor for a personal news podcast.
+Rewrite the following news article into a podcast script.
+
+Style:
+- Write in correct, natural {language_name}. No bureaucratic or overly formal phrasing.
+- Use short sentences, active voice. No jargon without explanation.
+- Use punctuation actively to guide rhythm and intonation:
+  - Em dashes (—) for a brief breathing pause or parenthetical.
+  - Ellipses (...) for a dramatic or reflective pause.
+  - Commas and semicolons for natural resting points.
+  - Rhetorical questions for engagement.
+- Alternate long and short sentences. A short sentence after a long one draws attention.
+- Guide emphasis through word order: place the key word at the end or beginning of the sentence.
+- Write numbers in words (fifteen million, not 15,000,000).
+- Write abbreviations in full on first use \
+(NATO becomes "NATO, the North Atlantic Treaty Organization" — adapt to the target language).
+- Use natural transitions between paragraphs.
 
 Intro:
-- Begin NIET elke keer met dezelfde openingszin. Varieer de intro.
-- Verwerk de bron (NRC, NOS, New York Times, etc.) en het onderwerp in de eerste zin. \
-Voorbeelden van gevarieerde openingen:
+{intro_instructions}
+
+Closing:
+- End with a brief one-sentence summary.
+
+Length and format:
+- Keep the length under 2 minutes of reading time (max ~1,500 characters).
+- Divide the script into short paragraphs (3-5 sentences each), separated by a blank line. \
+Each paragraph covers one point or aspect of the story. The blank lines create natural pauses when read aloud.
+- Return ONLY the spoken script as plain text.
+- Do NOT use markdown, headings, bullet points, or dividers.
+- Do NOT use placeholders like [source] or [date] — if information is missing, leave it out.
+- Do NOT invent facts, names, or quotes not in the original article."""
+
+_INTRO_NL = """\
+- Do NOT start with the same opening sentence every time. Vary the intro.
+- Weave the source (NRC, NOS, New York Times, etc.) and topic into the first sentence. \
+Examples of varied openings:
   "Uit de NRC: een verhaal over..."
   "De New York Times schrijft vandaag over..."
   "Op NOS.nl verscheen een artikel over..."
   "Een opvallend bericht uit de NRC vandaag..."
   "Volgens de New York Times..."
-- Als er een datum beschikbaar is, verwerk die natuurlijk (bijv. "afgelopen dinsdag", "vandaag", "eerder deze week"). \
-Noem de datum NIET als die ontbreekt.
-- Als de bron ontbreekt, begin dan direct met het onderwerp.
+- If a date is available, incorporate it naturally (e.g., "afgelopen dinsdag", "vandaag"). \
+Do NOT mention the date if it's missing.
+- If the source is missing, start directly with the topic."""
 
-Afsluiting:
-- Sluit af met een korte samenvatting in één zin.
-
-Lengte en format:
-- Houd de lengte onder de 2 minuten leestijd (maximaal ~1.500 karakters).
-- Verdeel het script in korte alinea's (3-5 zinnen per alinea), gescheiden door een witregel. \
-Elke alinea behandelt één punt of aspect van het verhaal. De witregels zorgen voor natuurlijke pauzes bij het voorlezen.
-- Geef ALLEEN het uitgesproken script terug als platte tekst.
-- Gebruik GEEN markdown, geen kopjes, geen opsommingstekens, geen scheidingslijnen.
-- Gebruik GEEN placeholders zoals [bron] of [datum] — als informatie ontbreekt, laat het weg.
-- Verzin GEEN feiten, namen, of citaten die niet in het originele artikel staan."""
+_INTRO_OTHER = """\
+- Start with a SHORT Dutch intro sentence (one sentence only) that names the source \
+and topic, e.g. "Uit de New York Times vandaag, een artikel over kunstmatige intelligentie." \
+or "Der Spiegel bericht over de Duitse verkiezingen."
+- After this single Dutch intro sentence, write the ENTIRE rest of the script in {language_name}.
+- Do NOT start with the same opening sentence every time. Vary the intro.
+- If a date is available, incorporate it naturally. Do NOT mention the date if it's missing.
+- If the source is missing, start the Dutch intro with the topic directly."""
 
 
 def generate_script(
@@ -67,34 +88,55 @@ def generate_script(
     """Genereer een podcastscript op basis van een artikeltekst.
 
     Args:
-        article: dict met minimaal 'text', optioneel 'title', 'source', 'date'
+        article: dict met minimaal 'text', optioneel 'title', 'source', 'date', 'language'
         api_key: Anthropic API-key
         model: Claude-model om te gebruiken
 
     Returns:
         Podcastscript als string
     """
-    logger.info("Scriptgeneratie gestart: model=%s, titel='%s'", model, article.get("title", "?"))
+    language = article.get("language", "nl")
+    language_name = _LANGUAGE_NAMES.get(language, "Dutch")
+
+    logger.info(
+        "Scriptgeneratie gestart: model=%s, taal=%s, titel='%s'",
+        model, language, article.get("title", "?"),
+    )
     client = anthropic.Anthropic(api_key=api_key)
+
+    # Kies intro-instructies op basis van taal
+    if language == "nl":
+        intro_instructions = _INTRO_NL
+    else:
+        intro_instructions = _INTRO_OTHER.format(language_name=language_name)
+
+    system_prompt = SYSTEM_PROMPT.format(
+        language_name=language_name,
+        intro_instructions=intro_instructions,
+    )
 
     # Bouw de user-prompt op met beschikbare metadata
     parts = []
     if article.get("title"):
-        parts.append(f"Titel: {article['title']}")
+        parts.append(f"Title: {article['title']}")
     if article.get("source"):
-        parts.append(f"Bron: {article['source']}")
+        parts.append(f"Source: {article['source']}")
     if article.get("date"):
-        parts.append(f"Datum: {article['date']}")
-    parts.append(f"\nArtikel:\n{article['text']}")
+        parts.append(f"Date: {article['date']}")
+    parts.append(f"Language: {language_name}")
+    parts.append(f"\nArticle:\n{article['text']}")
 
     user_prompt = "\n".join(parts)
     logger.debug("Prompt opgebouwd: %d chars (artikel: %d chars)", len(user_prompt), len(article.get("text", "")))
 
+    messages: list[anthropic.types.MessageParam] = [
+        {"role": "user", "content": user_prompt},
+    ]
     message = client.messages.create(
         model=model,
         max_tokens=2000,
-        messages=[{"role": "user", "content": user_prompt}],
-        system=SYSTEM_PROMPT,
+        messages=messages,
+        system=system_prompt,
     )
 
     script = message.content[0].text
@@ -105,25 +147,26 @@ def generate_script(
     )
 
     # Grammaticacontrole via LanguageTool
-    script = _fix_grammar(script)
+    script = _fix_grammar(script, language)
 
     return script
 
 
-def _fix_grammar(text: str) -> str:
+def _fix_grammar(text: str, language: str = "nl") -> str:
     """Corrigeer grammaticafouten via de gratis LanguageTool API.
 
-    Stuurt de tekst naar de publieke LanguageTool API voor Nederlandse
-    grammaticacontrole. Past automatisch correcties toe (bijv. 'sprang' → 'sprong').
+    Stuurt de tekst naar de publieke LanguageTool API voor
+    grammaticacontrole. Past automatisch correcties toe.
     Bij fouten wordt de originele tekst ongewijzigd teruggegeven.
     """
-    logger.debug("Grammaticacontrole gestart (%d chars)", len(text))
+    lt_lang = _LANGUAGETOOL_CODES.get(language, "nl")
+    logger.debug("Grammaticacontrole gestart (%d chars, taal=%s)", len(text), lt_lang)
     try:
         response = httpx.post(
             "https://api.languagetool.org/v2/check",
             data={
                 "text": text,
-                "language": "nl",
+                "language": lt_lang,
                 "enabledOnly": "false",
             },
             timeout=10.0,

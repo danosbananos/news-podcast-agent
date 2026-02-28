@@ -190,11 +190,13 @@ async def process_article(episode_id: uuid.UUID, article: dict):
         filename = f"{timestamp}_{slug}.mp3"
         output_path = AUDIO_DIR / filename
 
+        language = article.get("language", "nl")
         generate_audio(
             script=script,
             output_path=str(output_path),
             api_key=ELEVENLABS_API_KEY,
             voice_id=ELEVENLABS_VOICE_ID,
+            language=language,
         )
 
         # Stap 3: Duur schatten (~150 woorden per minuut bij TTS)

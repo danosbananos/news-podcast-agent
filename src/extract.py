@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 import pdfplumber
 import trafilatura
+from langdetect import detect, LangDetectException
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,45 @@ _BROWSER_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8",
 }
+
+
+_SUPPORTED_LANGUAGES = {"nl", "en", "de"}
+
+# Bekende Britse domeinen — als het domein hierin voorkomt, wordt "en" → "en-GB"
+# Alles onder .uk wordt automatisch herkend; deze set is voor .com-domeinen
+_UK_DOMAINS_COM = {
+    "bbc.com",
+    "theguardian.com",
+    "thetimes.com",
+    "ft.com",
+    "economist.com",
+    "reuters.com",
+}
+
+
+def _detect_language(text: str, url: str | None = None) -> str:
+    """Detecteer de taal van een tekst. Retourneert taalcode ('nl', 'en', 'en-GB', 'de').
+
+    Voor Engelstalige teksten van bekende UK-domeinen wordt 'en-GB' teruggegeven.
+    Valt terug op 'nl' als de taal niet gedetecteerd kan worden of niet ondersteund is.
+    """
+    try:
+        lang = detect(text)
+        if lang not in _SUPPORTED_LANGUAGES:
+            logger.info("Taal '%s' niet ondersteund, fallback naar 'nl'", lang)
+            return "nl"
+        # Verfijn Engels naar en-GB als het domein Brits is
+        if lang == "en" and url:
+            hostname = urlparse(url).hostname or ""
+            domain = hostname.removeprefix("www.")
+            if domain.endswith(".uk") or domain in _UK_DOMAINS_COM:
+                logger.info("Taal gedetecteerd: en-GB (domein %s)", domain)
+                return "en-GB"
+        logger.info("Taal gedetecteerd: %s", lang)
+        return lang
+    except LangDetectException as e:
+        logger.warning("Taaldetectie mislukt (%s), fallback naar 'nl'", e)
+        return "nl"
 
 
 def _extract_html_title(html: str) -> str:
@@ -87,7 +127,8 @@ def from_url(url: str) -> dict:
     title = (doc.title if doc else None) or _extract_html_title(downloaded) or ""
     source = (doc.sitename if doc else None) or _domain_to_source(url)
 
-    logger.info("URL extractie voltooid: titel='%s', bron=%s, tekst=%d chars", title, source, len(text))
+    language = _detect_language(text, url=url)
+    logger.info("URL extractie voltooid: titel='%s', bron=%s, taal=%s, tekst=%d chars", title, source, language, len(text))
 
     return {
         "text": text,
@@ -95,6 +136,7 @@ def from_url(url: str) -> dict:
         "author": (doc.author if doc else None) or "",
         "source": source,
         "date": (doc.date if doc else None) or "",
+        "language": language,
     }
 
 
@@ -118,8 +160,9 @@ def from_pdf(pdf_path: str) -> dict:
         logger.warning("Onvoldoende tekst uit PDF (%d chars): %s", len(text.strip()), pdf_path)
         raise ValueError("Kon geen bruikbare tekst uit de PDF extraheren.")
 
-    logger.info("PDF extractie voltooid: %d pagina's, %d chars", len(pages), len(text))
-    return {"text": text, "title": path.stem}
+    language = _detect_language(text)
+    logger.info("PDF extractie voltooid: %d pagina's, %d chars, taal=%s", len(pages), len(text), language)
+    return {"text": text, "title": path.stem, "language": language}
 
 
 def from_text(text: str, title: str = "", source: str = "") -> dict:
@@ -127,5 +170,6 @@ def from_text(text: str, title: str = "", source: str = "") -> dict:
     if len(text.strip()) < 50:
         logger.warning("Tekst te kort: %d chars (minimaal 50)", len(text.strip()))
         raise ValueError("Tekst is te kort om een podcastscript van te maken.")
-    logger.info("Tekst-extractie: titel='%s', bron='%s', %d chars", title, source, len(text))
-    return {"text": text, "title": title, "source": source}
+    language = _detect_language(text)
+    logger.info("Tekst-extractie: titel='%s', bron='%s', taal=%s, %d chars", title, source, language, len(text))
+    return {"text": text, "title": title, "source": source, "language": language}

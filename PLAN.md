@@ -74,7 +74,64 @@ Browser-achtige HTTP headers (met name `Accept` en `User-Agent`) toegevoegd als 
 
 ---
 
-## 5. Tweestemmigheid voor interviews
+## 5. Taaldetectie: Engels en Duits in oorspronkelijke taal voorlezen
+**Status:** Done
+**Prioriteit:** Medium | **Effort:** Medium
+
+### Probleem
+Engelstalige en Duitstalige artikelen worden nu voorgelezen met een Nederlandse stem en in het Nederlands herschreven. Dit verliest nuance en klinkt onnatuurlijk bij artikelen die beter in de oorspronkelijke taal blijven.
+
+### Gewenst gedrag
+- **Nederlands artikel** → Nederlands script, Nederlandse stem (huidige flow)
+- **Engels artikel** → Engels script, Engelse stem
+- **Duits artikel** → Duits script, Duitse stem
+- De podcast-intro mag kort in het Nederlands ("Uit de New York Times vandaag, een artikel over..."), maar het artikel zelf blijft in de oorspronkelijke taal
+
+### Oplossing
+
+**Stap 1: Taaldetectie (`src/extract.py`)**
+- Detecteer de taal van de geëxtraheerde tekst
+- Optie A: Gebruik `langdetect` of `lingua-py` (lichtgewicht, pip-installeerbaar)
+- Optie B: Laat Claude de taal bepalen als onderdeel van de scriptgeneratie (geen extra dependency, maar kost tokens)
+- Optie C: Baseer op het domein (nytimes.com → Engels, spiegel.de → Duits) — simpelst maar niet waterdicht
+- Sla de gedetecteerde taal op in het `article` dict als `language` (bijv. "nl", "en", "de")
+
+**Stap 2: Scriptgeneratie (`src/scriptgen.py`)**
+- Eén Engelstalige system prompt voor alle talen (Engels werkt het best als instructietaal voor Claude)
+- Voeg de doeltaal toe als parameter: "Write the script in {language}"
+- Voor niet-Nederlandse artikelen: "Begin met een korte Nederlandse intro-zin die de bron noemt, schrijf de rest in {language}"
+- Voor Nederlandse artikelen: huidige gedrag (alles Nederlands)
+- Geen aparte prompt-varianten per taal nodig
+
+**Stap 3: TTS voice-selectie (`src/tts.py`)**
+- Kies stem en taal op basis van `article["language"]`:
+  - `nl` → huidige stemmen (ElevenLabs NL, Gemini nl-NL, WaveNet nl-NL)
+  - `en` → Engelse stemmen (ElevenLabs EN voice, Gemini en-US, WaveNet en-US)
+  - `de` → Duitse stemmen (ElevenLabs DE voice, Gemini de-DE, WaveNet de-DE)
+- Nieuwe env vars voor extra stemmen:
+  - `ELEVENLABS_VOICE_ID_EN`, `ELEVENLABS_VOICE_ID_DE`
+  - `GOOGLE_TTS_GEMINI_VOICE_EN`, `GOOGLE_TTS_GEMINI_VOICE_DE`
+  - `GOOGLE_TTS_WAVENET_VOICE_EN` (bijv. `en-US-Wavenet-D`), `GOOGLE_TTS_WAVENET_VOICE_DE` (bijv. `de-DE-Wavenet-C`)
+
+### Bestanden
+| File | Actie |
+|---|---|
+| `src/extract.py` | Taaldetectie toevoegen, `language` veld in article dict |
+| `src/scriptgen.py` | Taal-afhankelijke prompt |
+| `src/tts.py` | Taal-afhankelijke voice-selectie |
+| `requirements.txt` | Eventueel `langdetect` of `lingua-py` toevoegen |
+
+### Beslissingen
+- Taaldetectie via `langdetect` (lichtgewicht, betrouwbaar, geen API-call)
+- Nederlandse intro-zin, rest in oorspronkelijke taal
+- Eén Engelstalige prompt met taal-parameter (geen aparte prompts per taal)
+
+### Open vragen
+- Welke Engelse/Duitse stemmen kiezen per TTS-provider?
+
+---
+
+## 6. Tweestemmigheid voor interviews
 **Status:** Todo
 **Prioriteit:** Laag | **Effort:** Hoog
 
@@ -82,7 +139,7 @@ Browser-achtige HTTP headers (met name `Accept` en `User-Agent`) toegevoegd als 
 Interviews worden nu voorgelezen als monoloog, wat onnatuurlijk klinkt.
 
 ### Oplossing
-Gebruik twee ElevenLabs-stemmen (host + gast) voor interview-artikelen:
+Gebruik twee stemmen (host + gast) voor interview-artikelen:
 
 **Scriptgeneratie:**
 - LLM formatteert het script met sprekersaanduidingen: `[HOST]: ...` en `[GAST]: ...`
@@ -90,25 +147,17 @@ Gebruik twee ElevenLabs-stemmen (host + gast) voor interview-artikelen:
 
 **TTS-pipeline (`src/tts.py`):**
 - Parse het script op sprekersaanduidingen
-- Genereer audio per segment met de juiste `voice_id`
+- Genereer audio per segment met de juiste voice
 - Concateneer alle segmenten tot één MP3
 
 **Benodigdheden:**
-- Tweede ElevenLabs `voice_id` configureren (`ELEVENLABS_VOICE_ID_GUEST`)
+- Tweede voice configureren per provider
 - Aangepaste system prompt voor interview-scripts
 - Segment-parser in de TTS-pipeline
 
 ### Open vragen
 - Automatische interview-detectie vs. handmatige keuze door gebruiker?
 - Welke tweede stem? (Ander geslacht/karakter voor duidelijk onderscheid)
-
----
-
-## 6. Engelse stem bij Engelstalig artikel
-**Status:** Todo
-**Prioriteit:** Laag | **Effort:** Medium
-
-Automatisch de juiste TTS-stem en taal kiezen op basis van de taal van het artikel. Moet nog uitgewerkt worden.
 
 ---
 
