@@ -442,7 +442,7 @@ async def upload_pdf(
     )
 
 
-@app.get("/feed.xml")
+@app.api_route("/feed.xml", methods=["GET", "HEAD"])
 async def get_feed():
     """Serveer de podcast RSS feed (publiek, geen auth)."""
     episodes = await list_episodes(limit=50)
@@ -471,7 +471,7 @@ async def setup_page():
     return HTMLResponse(content=path.read_text(encoding="utf-8"))
 
 
-@app.get("/audio/{filename}")
+@app.api_route("/audio/{filename}", methods=["GET", "HEAD"])
 async def get_audio(filename: str):
     """Serveer een mp3-bestand (publiek, geen auth)."""
     # Voorkom path traversal
@@ -485,7 +485,7 @@ async def get_audio(filename: str):
     return FileResponse(path, media_type="audio/mpeg", filename=filename)
 
 
-@app.get("/episode-images/{filename}")
+@app.api_route("/episode-images/{filename}", methods=["GET", "HEAD"])
 async def get_episode_image(filename: str):
     """Serveer lokaal opgeslagen episode-artwork."""
     if "/" in filename or "\\" in filename or ".." in filename:
@@ -498,7 +498,7 @@ async def get_episode_image(filename: str):
     return FileResponse(path, media_type="image/jpeg", filename=filename)
 
 
-@app.get("/transcripts/{filename}")
+@app.api_route("/transcripts/{filename}", methods=["GET", "HEAD"])
 async def get_transcript(filename: str):
     """Serveer transcriptbestand (VTT)."""
     if "/" in filename or "\\" in filename or ".." in filename:
