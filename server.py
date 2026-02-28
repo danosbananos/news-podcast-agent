@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 # Logging configureren — LOG_LEVEL via env var instelbaar (default: INFO)
 logging.basicConfig(
@@ -36,7 +37,8 @@ from src.database import (
     list_episodes,
     update_episode,
 )
-from src.extract import from_pdf, from_text, from_url
+from src.extract import from_pdf, from_text, from_url, from_url_metadata
+from src.episode_image import process_episode_image
 from src.feed import generate_feed
 from src.notify import send as notify
 from src.scriptgen import generate_script
@@ -50,6 +52,7 @@ if _env_file.exists():
 # --- Config ---
 
 AUDIO_DIR = Path(os.getenv("AUDIO_DIR", "./output"))
+EPISODE_IMAGE_DIR = Path(os.getenv("EPISODE_IMAGE_DIR", str(AUDIO_DIR / "episode-images")))
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 API_KEY = os.getenv("API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
@@ -73,11 +76,41 @@ def _delete_audio_file(filename: str | None):
         path.unlink(missing_ok=True)
 
 
+def _delete_episode_image_file(image_url: str | None):
+    """Verwijder lokaal gehoste episode-image als die bestaat."""
+    if not image_url:
+        return
+    path_part = urlparse(image_url).path or ""
+    prefix = "/episode-images/"
+    if not path_part.startswith(prefix):
+        return
+    filename = path_part.removeprefix(prefix)
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return
+    path = EPISODE_IMAGE_DIR / filename
+    if path.exists():
+        logger.debug("Episode-image verwijderd: %s", path)
+    path.unlink(missing_ok=True)
+
+
+def _materialize_episode_image(article: dict):
+    """Zet remote image_url om naar lokaal gehoste vierkante JPEG voor Apple Podcasts."""
+    image_url = article.get("image_url")
+    if not image_url:
+        return
+    try:
+        local_path = process_episode_image(image_url, EPISODE_IMAGE_DIR)
+        article["image_url"] = f"{BASE_URL.rstrip('/')}/episode-images/{local_path.name}"
+    except Exception as e:
+        logger.warning("Episode-image verwerking mislukt (%s), gebruik originele image_url", e)
+
+
 async def _cleanup_old_episodes():
     """Verwijder episodes ouder dan RETENTION_DAYS en hun audiobestanden."""
     episodes = await delete_episodes_older_than(days=RETENTION_DAYS)
     for ep in episodes:
         _delete_audio_file(ep.audio_filename)
+        _delete_episode_image_file(ep.image_url)
     if episodes:
         logger.info("Cleanup: %d episode(s) ouder dan %d dagen verwijderd", len(episodes), RETENTION_DAYS)
     else:
@@ -90,6 +123,7 @@ async def _cleanup_orphaned_episodes():
     orphaned = [ep for ep in episodes if ep.audio_filename and not (AUDIO_DIR / ep.audio_filename).exists()]
     for ep in orphaned:
         logger.debug("Orphaned episode verwijderd: %s (%s)", ep.title, ep.id)
+        _delete_episode_image_file(ep.image_url)
         await delete_episode(ep.id)
     if orphaned:
         logger.info("Cleanup: %d episode(s) zonder audiobestand verwijderd", len(orphaned))
@@ -101,6 +135,7 @@ async def _cleanup_orphaned_episodes():
 async def lifespan(app: FastAPI):
     logger.info("Server start — audio_dir=%s, retention=%d dagen", AUDIO_DIR, RETENTION_DAYS)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    EPISODE_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     await init_db()
     # Ruim op bij elke (her)start
     await _cleanup_old_episodes()
@@ -285,6 +320,23 @@ async def submit_article(req: SubmitRequest, background_tasks: BackgroundTasks):
     if req.source:
         article["source"] = req.source
 
+    # Bij text+url: verrijk metadata uit URL (vooral image_url) zonder tekst te overschrijven.
+    if req.text and req.url:
+        try:
+            metadata = from_url_metadata(req.url)
+            if metadata.get("image_url"):
+                article["image_url"] = metadata["image_url"]
+            if not article.get("source") and metadata.get("source"):
+                article["source"] = metadata["source"]
+            if not article.get("title") and metadata.get("title"):
+                article["title"] = metadata["title"]
+            if not article.get("date") and metadata.get("date"):
+                article["date"] = metadata["date"]
+        except ValueError as e:
+            logger.info("URL metadata-verrijking overgeslagen: %s", e)
+
+    _materialize_episode_image(article)
+
     # Database record aanmaken
     episode = await create_episode(
         article_text=article["text"],
@@ -337,6 +389,8 @@ async def upload_pdf(
         article["title"] = title
     if source:
         article["source"] = source
+
+    _materialize_episode_image(article)
 
     episode = await create_episode(
         article_text=article["text"],
@@ -398,6 +452,19 @@ async def get_audio(filename: str):
     return FileResponse(path, media_type="audio/mpeg", filename=filename)
 
 
+@app.get("/episode-images/{filename}")
+async def get_episode_image(filename: str):
+    """Serveer lokaal opgeslagen episode-artwork."""
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Ongeldige bestandsnaam")
+
+    path = EPISODE_IMAGE_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Afbeelding niet gevonden")
+
+    return FileResponse(path, media_type="image/jpeg", filename=filename)
+
+
 @app.get("/episodes", response_model=list[EpisodeResponse])
 async def get_episodes():
     """Lijst van alle afleveringen (voor debugging/dashboard)."""
@@ -433,6 +500,7 @@ async def delete_episode_endpoint(episode_id: str):
         raise HTTPException(status_code=404, detail="Aflevering niet gevonden")
 
     _delete_audio_file(episode.audio_filename)
+    _delete_episode_image_file(episode.image_url)
     logger.info("Episode verwijderd: id=%s, titel='%s'", episode_id, episode.title)
     return {"status": "deleted", "title": episode.title}
 

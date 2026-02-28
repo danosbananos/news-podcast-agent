@@ -7,6 +7,7 @@ lxml_html_clean>=0.4.0
 langdetect>=1.0.9
 
 pydub>=0.25.1
+Pillow>=10.0.0
 google-cloud-texttospeech>=2.24.0
 
 # Fase 2: Server
